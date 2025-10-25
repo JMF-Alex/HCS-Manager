@@ -264,7 +264,7 @@ function renderTable() {
     const tr = document.createElement("tr")
     tr.innerHTML = `
       <td>
-        <input type="checkbox" class="item-checkbox" data-id="${id}" />
+        <input type="checkbox" class="checkbox-input item-checkbox" data-id="${id}" />
       </td>
       <td><strong>${escapeHtml(name)}</strong></td>
       <td>${escapeHtml(type)}</td>
