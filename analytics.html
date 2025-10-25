@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="HCS-Manager - Analytics and insights" />
+  <link rel="icon" type="image/jpeg" href="assets/img/logo.webp" />
+  <title>HCS-Manager - Analytics</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <div class="logo-container">
+        <img src="assets/img/logo.webp" alt="HCS Logo" class="logo" />
+      </div>
+      <h1 class="app-title">HCS-Manager</h1>
+    </div>
+    
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Inventory</a>
+      <a href="history.html" class="nav-link">History</a>
+      <a href="analytics.html" class="nav-link active">Analytics</a>
+    </div>
+
+    <div class="nav-actions">
+      <button id="themeToggle" class="icon-btn" title="Toggle theme">
+        <span class="theme-icon">🌙</span>
+      </button>
+      <button id="refreshData" class="btn btn-primary">Refresh Data</button>
+    </div>
+  </nav>
+
+  <main class="container" style="display: block;">
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem;">
+      <div class="header-content">
+        <h2>Analytics Dashboard</h2>
+        <p class="subtitle">Insights and statistics from your inventory and sales</p>
+      </div>
+      
+      <div class="stat-card" style="min-width: 200px; max-width: 250px;">
+        <div class="stat-label">Total Balance</div>
+        <div class="stat-value" id="totalBalance">€0.00</div>
+        <div class="stat-change" id="balanceBreakdown"></div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Inventory Value</div>
+        <div class="stat-value" id="totalInventoryValue">€0.00</div>
+        <div class="stat-change" id="inventoryChange">0 items</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Total Profit</div>
+        <div class="stat-value" id="totalProfit">€0.00</div>
+        <div class="stat-change" id="profitChange">From all sales</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Items Sold</div>
+        <div class="stat-value" id="itemsSold">0</div>
+        <div class="stat-change" id="soldChange">Total transactions</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Average Profit Margin</div>
+        <div class="stat-value" id="avgProfitMargin">0%</div>
+        <div class="stat-change" id="marginChange">Per sale</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">Profit by Type</h3>
+          <p class="chart-subtitle">Total profit breakdown by item category</p>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="profitByTypeChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-header">
+          <h3 class="chart-title">Inventory Distribution</h3>
+          <p class="chart-subtitle">Current inventory by item type</p>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="inventoryDistChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <div>
+          <h3 class="chart-title">Sales Over Time</h3>
+          <p class="chart-subtitle">Monthly profit trends</p>
+        </div>
+        <label class="chart-limit-label">
+          Show last:
+          <select id="timelineLimit" class="chart-limit-select">
+            <option value="6">6 months</option>
+            <option value="12" selected>12 months</option>
+            <option value="24">24 months</option>
+            <option value="all">All time</option>
+          </select>
+        </label>
+      </div>
+      <div class="chart-wrapper" style="height: 350px;">
+        <canvas id="salesTimelineChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <div>
+          <h3 class="chart-title">Top Profitable Items</h3>
+          <p class="chart-subtitle">Best performing sales</p>
+        </div>
+        <label class="chart-limit-label">
+          Show top:
+          <select id="topItemsLimit" class="chart-limit-select">
+            <option value="5">5 items</option>
+            <option value="10" selected>10 items</option>
+            <option value="15">15 items</option>
+            <option value="20">20 items</option>
+          </select>
+        </label>
+      </div>
+      <div class="chart-wrapper" style="height: 350px;">
+        <canvas id="topItemsChart"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/pages/analytics.js"></script>
+</body>
+</html>
