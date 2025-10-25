@@ -237,7 +237,7 @@ function renderTable() {
     profit: document.getElementById("filterProfit")?.value || "",
   }
 
-  let filteredData = history.filter((item) => {
+  filteredData = history.filter((item) => {
     if (
       filters.search &&
       !item.name.toLowerCase().includes(filters.search) &&
