@@ -70,7 +70,7 @@ That’s it — the app runs entirely locally!
 Once opened, you can:  
 - Add new transactions (purchase/sale of skins)  
 - View summaries of total spent, earned, and profit  
-- Export your data to a `.db` file  
+- Export your data to a `.json` file  
 - Import previously saved records  
 - Data remains saved even after closing or reloading the page  
 
