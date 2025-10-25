@@ -4,6 +4,7 @@ let currentPage = 1
 let itemsPerPage = 10
 let filteredData = []
 const selectedItems = new Set()
+const PROXY = "https://corsproxy.io/?"
 
 initialize()
 
@@ -20,6 +21,12 @@ async function initialize() {
       database = new sqlModule.Database(dataArray)
 
       try {
+        database.exec("SELECT steam_link FROM skins LIMIT 1")
+      } catch (e) {
+        database.run("ALTER TABLE skins ADD COLUMN steam_link TEXT")
+      }
+
+      try {
         database.exec("SELECT purchase_date FROM skins LIMIT 1")
       } catch (e) {
         database.run("ALTER TABLE skins ADD COLUMN purchase_date TEXT")
@@ -32,7 +39,8 @@ async function initialize() {
         type TEXT,
         buy_price REAL, 
         sell_price REAL,
-        purchase_date TEXT
+        purchase_date TEXT,
+        steam_link TEXT
       );`)
     }
 
@@ -212,7 +220,7 @@ function renderTable() {
   let rows = result[0].values
 
   rows = rows.filter((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
 
     if (
       filters.search &&
@@ -258,19 +266,28 @@ function renderTable() {
   }
 
   for (const row of paginatedRows) {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
     const formattedDate = formatDate(purchaseDate)
 
     const tr = document.createElement("tr")
+    const nameDisplay = steamLink
+      ? `<a href="${escapeHtml(steamLink)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">${escapeHtml(name)}</a>`
+      : `<strong>${escapeHtml(name)}</strong>`
+
+    const infoButton = steamLink
+      ? `<button class="action-btn info" onclick="showInfoModal(${id}, '${escapeHtml(steamLink).replace(/'/g, "\\'")}', '${escapeHtml(name).replace(/'/g, "\\'")}', '${purchaseDate}')">Info</button>`
+      : ""
+
     tr.innerHTML = `
       <td>
         <input type="checkbox" class="checkbox-input item-checkbox" data-id="${id}" />
       </td>
-      <td><strong>${escapeHtml(name)}</strong></td>
+      <td>${nameDisplay}</td>
       <td>${escapeHtml(type)}</td>
       <td>€${buyPrice.toFixed(2)}</td>
       <td style="color: var(--text-muted); font-size: 0.875rem;">${formattedDate}</td>
       <td>
+        ${infoButton}
         <button class="action-btn sell" onclick="showSellModal(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')">Sell</button>
         <button class="action-btn delete" style="background-color: #dc2626; color: white;" onclick="confirmDeleteItem(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')">Delete</button>
       </td>
@@ -426,6 +443,50 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
+async function fetchSteamData(steamUrl) {
+  const match = steamUrl.match(/listings\/(\d+)\/(.+?)(?:\?|$)/)
+  if (!match) {
+    throw new Error("Invalid Steam Market URL")
+  }
+
+  const appid = match[1]
+  const hashName = decodeURIComponent(match[2])
+
+  try {
+    const renderUrl = `https://steamcommunity.com/market/listings/${appid}/${encodeURIComponent(hashName)}/render?count=1&currency=1&format=json`
+    const renderRes = await fetch(PROXY + encodeURIComponent(renderUrl))
+    const render = await renderRes.json()
+
+    let nombre = "(no encontrado)"
+    let imagen = null
+
+    if (render.assets && render.assets[appid]) {
+      const contextId = Object.keys(render.assets[appid])[0]
+      const firstAsset = Object.values(render.assets[appid][contextId])[0]
+      if (firstAsset) {
+        nombre = firstAsset.market_name || firstAsset.name || nombre
+        const iconUrl = firstAsset.icon_url_large || firstAsset.icon_url
+        if (iconUrl) imagen = "https://steamcommunity-a.akamaihd.net/economy/image/" + iconUrl
+      }
+    }
+
+    const priceUrl = `https://steamcommunity.com/market/priceoverview/?appid=${appid}&market_hash_name=${encodeURIComponent(hashName)}&currency=3`
+    const priceRes = await fetch(PROXY + encodeURIComponent(priceUrl))
+    const price = await priceRes.json()
+
+    const precioStr = price.lowest_price || "0"
+    const precioNum = Number.parseFloat(precioStr.replace(/[^0-9.,]/g, "").replace(",", "."))
+
+    return {
+      name: nombre,
+      price: precioNum || 0,
+      image: imagen,
+    }
+  } catch (e) {
+    throw new Error("Error fetching Steam data: " + e.message)
+  }
+}
+
 function showAddModal() {
   const modal = document.getElementById("modal")
   const title = document.getElementById("modalTitle")
@@ -434,6 +495,12 @@ function showAddModal() {
   title.textContent = "Add New Skin"
   body.innerHTML = `
     <form id="addForm">
+      <div class="form-group">
+        <label>Steam Market Link</label>
+        <input type="url" id="steamLink" placeholder="https://steamcommunity.com/market/listings/..." />
+        <button type="button" class="btn btn-secondary" id="fetchSteamData" style="margin-top: 8px;">Fetch Data from Steam</button>
+        <div id="steamFetchStatus" style="margin-top: 8px; font-size: 0.875rem;"></div>
+      </div>
       <div class="form-group">
         <label>Name</label>
         <input type="text" id="skinName" required placeholder="e.g. AK-47 Redline" />
@@ -469,6 +536,41 @@ function showAddModal() {
   modal.classList.add("active")
   document.getElementById("purchaseDate").valueAsDate = new Date()
 
+  document.getElementById("fetchSteamData").addEventListener("click", async () => {
+    const steamLinkInput = document.getElementById("steamLink")
+    const statusDiv = document.getElementById("steamFetchStatus")
+    const nameInput = document.getElementById("skinName")
+    const priceInput = document.getElementById("buyPrice")
+
+    const steamUrl = steamLinkInput.value.trim()
+
+    if (!steamUrl) {
+      statusDiv.textContent = "⚠️ Please enter a Steam Market URL"
+      statusDiv.style.color = "var(--danger)"
+      return
+    }
+
+    statusDiv.textContent = "🔄 Fetching data from Steam..."
+    statusDiv.style.color = "var(--text-muted)"
+
+    try {
+      const data = await fetchSteamData(steamUrl)
+
+      nameInput.value = data.name
+      priceInput.value = data.price.toFixed(2)
+
+      statusDiv.textContent = "✅ Data fetched successfully!"
+      statusDiv.style.color = "var(--success)"
+
+      setTimeout(() => {
+        statusDiv.textContent = ""
+      }, 3000)
+    } catch (error) {
+      statusDiv.textContent = "❌ " + error.message
+      statusDiv.style.color = "var(--danger)"
+    }
+  })
+
   document.getElementById("addForm").onsubmit = (e) => {
     e.preventDefault()
     addSkin()
@@ -480,14 +582,12 @@ function addSkin() {
   const type = document.getElementById("skinType").value
   const buyPrice = Number.parseFloat(document.getElementById("buyPrice").value)
   const purchaseDate = document.getElementById("purchaseDate").value
+  const steamLink = document.getElementById("steamLink").value.trim() || null
 
-  database.run("INSERT INTO skins (name, type, buy_price, sell_price, purchase_date) VALUES (?, ?, ?, ?, ?)", [
-    name,
-    type,
-    buyPrice,
-    0,
-    purchaseDate,
-  ])
+  database.run(
+    "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link) VALUES (?, ?, ?, ?, ?, ?)",
+    [name, type, buyPrice, 0, purchaseDate, steamLink],
+  )
 
   saveDatabase()
   renderTable()
@@ -534,7 +634,7 @@ function sellSkin(id) {
   const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
 
   if (result && result[0]) {
-    const [skinId, name, type, buyPrice, estimatedSellPrice, purchaseDate] = result[0].values[0]
+    const [skinId, name, type, buyPrice, estimatedSellPrice, purchaseDate, steamLink] = result[0].values[0]
 
     const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
     history.push({
@@ -545,6 +645,7 @@ function sellSkin(id) {
       sell_price: salePrice,
       purchase_date: purchaseDate || null,
       sale_date: saleDate,
+      steam_link: steamLink || null,
     })
     localStorage.setItem("skinsHistory", JSON.stringify(history))
   }
@@ -622,5 +723,171 @@ function importDatabase(event) {
 }
 
 function closeModal() {
-  document.getElementById("modal").classList.remove("active")
+  const modal = document.getElementById("modal")
+  modal.classList.remove("active")
+  const modalContent = modal.querySelector(".modal-content")
+  if (modalContent) {
+    modalContent.classList.remove("wide")
+  }
+}
+
+async function showInfoModal(id, steamLink, savedName, purchaseDate) {
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+  const modalContent = modal.querySelector(".modal-content")
+  if (modalContent) {
+    modalContent.classList.add("wide")
+  }
+
+  title.textContent = "Skin Information"
+  body.innerHTML = `
+    <div class="info-modal-loading">
+      <div class="loading-spinner"></div>
+      <p>Loading Steam Market data...</p>
+    </div>
+  `
+
+  modal.classList.add("active")
+
+  try {
+    const result = database.exec("SELECT buy_price FROM skins WHERE id = ?", [id])
+    const purchasePrice = result && result[0] ? result[0].values[0][0] : 0
+
+    const match = steamLink.match(/listings\/(\d+)\/(.+?)(?:\?|$)/)
+    if (!match) {
+      throw new Error("Invalid Steam Market URL")
+    }
+
+    const appid = match[1]
+    const hashName = decodeURIComponent(match[2])
+
+    const renderUrl = `https://steamcommunity.com/market/listings/${appid}/${encodeURIComponent(hashName)}/render?count=1&currency=1&format=json`
+    const renderRes = await fetch(PROXY + encodeURIComponent(renderUrl))
+    const render = await renderRes.json()
+
+    let imagen = null
+
+    if (render.assets && render.assets[appid]) {
+      const contextId = Object.keys(render.assets[appid])[0]
+      const firstAsset = Object.values(render.assets[appid][contextId])[0]
+      if (firstAsset) {
+        savedName = firstAsset.market_name || firstAsset.name || savedName
+        const iconUrl = firstAsset.icon_url_large || firstAsset.icon_url
+        if (iconUrl) imagen = "https://steamcommunity-a.akamaihd.net/economy/image/" + iconUrl
+      }
+    }
+
+    const priceUrl = `https://steamcommunity.com/market/priceoverview/?appid=${appid}&market_hash_name=${encodeURIComponent(hashName)}&currency=3`
+    const priceRes = await fetch(PROXY + encodeURIComponent(priceUrl))
+    const price = await priceRes.json()
+
+    const lowestPriceStr = price.lowest_price || "0"
+    const medianPriceStr = price.median_price || "0"
+    const volume = price.volume || "N/A"
+
+    const currentPrice = Number.parseFloat(lowestPriceStr.replace(/[^0-9.,]/g, "").replace(",", ".")) || 0
+    const medianPrice = Number.parseFloat(medianPriceStr.replace(/[^0-9.,]/g, "").replace(",", ".")) || 0
+
+    const profitLoss = currentPrice - purchasePrice
+    const profitLossPercent = purchasePrice > 0 ? (profitLoss / purchasePrice) * 100 : 0
+    const isProfitable = profitLoss >= 0
+
+    const maxPrice = Math.max(purchasePrice, currentPrice, medianPrice)
+    const purchasePriceWidth = maxPrice > 0 ? (purchasePrice / maxPrice) * 100 : 0
+    const currentPriceWidth = maxPrice > 0 ? (currentPrice / maxPrice) * 100 : 0
+    const medianPriceWidth = maxPrice > 0 ? (medianPrice / maxPrice) * 100 : 0
+
+    body.innerHTML = `
+      <div class="info-modal-content-wide">
+        <div class="info-modal-left">
+          ${imagen ? `<div class="info-image-container-wide"><img src="${imagen}" alt="${escapeHtml(savedName)}" class="info-skin-image-wide" /></div>` : '<div class="info-image-placeholder">No Image Available</div>'}
+          
+          <div class="info-names">
+            <div class="info-name-item">
+              <span class="info-name-label">Market Name</span>
+              <span class="info-name-value">${escapeHtml(savedName)}</span>
+            </div>
+            <div class="info-name-item">
+              <span class="info-name-label">Purchased at</span>
+              <span class="info-name-value">${escapeHtml(purchaseDate)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-modal-right">
+          <div class="info-price-comparison">
+            <h3 class="info-section-header">Price Analysis</h3>
+            
+            <div class="price-bars">
+              <div class="price-bar-item">
+                <div class="price-bar-label">
+                  <span>Purchase Price</span>
+                  <span class="price-bar-value">€${purchasePrice.toFixed(2)}</span>
+                </div>
+                <div class="price-bar-track">
+                  <div class="price-bar-fill purchase" style="width: ${purchasePriceWidth}%"></div>
+                </div>
+              </div>
+
+              <div class="price-bar-item">
+                <div class="price-bar-label">
+                  <span>Current Price</span>
+                  <span class="price-bar-value">€${currentPrice.toFixed(2)}</span>
+                </div>
+                <div class="price-bar-track">
+                  <div class="price-bar-fill current" style="width: ${currentPriceWidth}%"></div>
+                </div>
+              </div>
+
+              <div class="price-bar-item">
+                <div class="price-bar-label">
+                  <span>Median Price</span>
+                  <span class="price-bar-value">€${medianPrice.toFixed(2)}</span>
+                </div>
+                <div class="price-bar-track">
+                  <div class="price-bar-fill median" style="width: ${medianPriceWidth}%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="profit-loss-card ${isProfitable ? "profit" : "loss"}">
+              <div class="profit-loss-label">${isProfitable ? "Potential Profit" : "Current Loss"}</div>
+              <div class="profit-loss-amount">${isProfitable ? "+" : ""}€${profitLoss.toFixed(2)}</div>
+              <div class="profit-loss-percent">${isProfitable ? "+" : ""}${profitLossPercent.toFixed(1)}%</div>
+            </div>
+          </div>
+
+          <div class="info-market-stats">
+            <h3 class="info-section-header">Market Statistics</h3>
+            <div class="market-stats-grid">
+              <div class="market-stat-item">
+                <div class="market-stat-icon">📊</div>
+                <div class="market-stat-content">
+                  <div class="market-stat-label">24h Volume</div>
+                  <div class="market-stat-value">${volume}</div>
+                </div>
+              </div>
+              <div class="market-stat-item">
+                <div class="market-stat-icon">🔗</div>
+                <div class="market-stat-content">
+                  <div class="market-stat-label">Steam Market</div>
+                  <a href="${escapeHtml(steamLink)}" target="_blank" rel="noopener noreferrer" class="market-link">View Listing</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    body.innerHTML = `
+      <div class="info-modal-error">
+        <div class="error-icon">⚠️</div>
+        <h3>Failed to Load Data</h3>
+        <p>${escapeHtml(error.message)}</p>
+        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    `
+  }
 }

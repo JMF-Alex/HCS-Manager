@@ -295,12 +295,16 @@ function renderTable() {
     const purchaseDate = formatDate(item.purchase_date)
     const saleDate = formatDate(item.sale_date)
 
+    const nameDisplay = item.steam_link
+      ? `<a href="${escapeHtml(item.steam_link)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">${escapeHtml(item.name)}</a>`
+      : `<strong>${escapeHtml(item.name)}</strong>`
+
     const tr = document.createElement("tr")
     tr.innerHTML = `
       <td>
         <input type="checkbox" class="checkbox-input item-checkbox" data-id="${item.id}" />
       </td>
-      <td><strong>${escapeHtml(item.name)}</strong></td>
+      <td>${nameDisplay}</td>
       <td>${escapeHtml(item.type)}</td>
       <td>€${item.buy_price.toFixed(2)}</td>
       <td>€${item.sell_price.toFixed(2)}</td>
