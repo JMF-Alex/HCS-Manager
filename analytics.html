@@ -20,7 +20,9 @@
     </div>
     
     <div class="nav-links">
-      <a href="index.html" class="nav-link">Inventory</a>
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="dashboard.html" class="nav-link">Dashboard</a>
+      <a href="inventory.html" class="nav-link">Inventory</a>
       <a href="history.html" class="nav-link">History</a>
       <a href="analytics.html" class="nav-link active">Analytics</a>
     </div>
@@ -29,6 +31,7 @@
       <button id="themeToggle" class="icon-btn" title="Toggle theme">
         <span class="theme-icon">🌙</span>
       </button>
+      <button id="accountBtn" class="btn btn-secondary">Account</button>
       <button id="refreshData" class="btn btn-primary">Refresh Data</button>
     </div>
   </nav>
@@ -137,6 +140,16 @@
       </div>
     </div>
   </main>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle"></h2>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
 
   <script src="js/pages/analytics.js"></script>
 </body>

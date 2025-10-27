@@ -47,6 +47,8 @@ function setupEventListeners() {
   const selectAll = document.getElementById("selectAll")
   const deleteSelected = document.getElementById("deleteSelected")
 
+  const accountBtn = document.getElementById("accountBtn")
+
   if (themeToggle) themeToggle.addEventListener("click", toggleTheme)
   if (clearBtn) clearBtn.addEventListener("click", confirmClearHistory)
   if (exportBtn) exportBtn.addEventListener("click", exportData)
@@ -62,6 +64,8 @@ function setupEventListeners() {
 
   if (selectAll) selectAll.addEventListener("change", handleSelectAll)
   if (deleteSelected) deleteSelected.addEventListener("click", confirmDeleteSelected)
+
+  if (accountBtn) accountBtn.addEventListener("click", showAccountModal)
 
   if (itemsPerPageSelect)
     itemsPerPageSelect.addEventListener("change", (e) => {
@@ -117,6 +121,43 @@ function toggleTheme() {
   document.documentElement.setAttribute("data-theme", newTheme)
   localStorage.setItem("theme", newTheme)
   updateThemeIcon(newTheme)
+}
+
+function showAccountModal() {
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  const savedLanguage = localStorage.getItem("language") || "en"
+
+  title.textContent = "Account Settings"
+  body.innerHTML = `
+    <form id="accountForm">
+      <div class="form-group">
+        <label>Language</label>
+        <select id="languageSelect" class="form-select">
+          <option value="en" ${savedLanguage === "en" ? "selected" : ""}>English</option>
+          <option value="es" ${savedLanguage === "es" ? "selected" : ""}>Español</option>
+          <option value="fr" ${savedLanguage === "fr" ? "selected" : ""}>Français</option>
+          <option value="de" ${savedLanguage === "de" ? "selected" : ""}>Deutsch</option>
+          <option value="pt" ${savedLanguage === "pt" ? "selected" : ""}>Português</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  `
+
+  modal.classList.add("active")
+
+  document.getElementById("accountForm").onsubmit = (e) => {
+    e.preventDefault()
+    const language = document.getElementById("languageSelect").value
+    localStorage.setItem("language", language)
+    closeModal()
+  }
 }
 
 function clearAllFilters() {

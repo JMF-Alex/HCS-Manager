@@ -51,8 +51,20 @@ function setupEventListeners() {
   const timelineLimitSelect = document.getElementById("timelineLimit")
   const topItemsLimitSelect = document.getElementById("topItemsLimit")
 
+  const accountBtn = document.getElementById("accountBtn")
+  const modalClose = document.getElementById("modalClose")
+  const modal = document.getElementById("modal")
+
   if (themeToggle) themeToggle.addEventListener("click", toggleTheme)
   if (refreshData) refreshData.addEventListener("click", loadAnalytics)
+
+  if (accountBtn) accountBtn.addEventListener("click", showAccountModal)
+  if (modalClose) modalClose.addEventListener("click", closeModal)
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target.id === "modal") closeModal()
+    })
+  }
 
   if (timelineLimitSelect) {
     timelineLimitSelect.addEventListener("change", (e) => {
@@ -77,6 +89,47 @@ function toggleTheme() {
   updateThemeIcon(newTheme)
 
   loadAnalytics()
+}
+
+function showAccountModal() {
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  const savedLanguage = localStorage.getItem("language") || "en"
+
+  title.textContent = "Account Settings"
+  body.innerHTML = `
+    <form id="accountForm">
+      <div class="form-group">
+        <label>Language</label>
+        <select id="languageSelect" class="form-select">
+          <option value="en" ${savedLanguage === "en" ? "selected" : ""}>English</option>
+          <option value="es" ${savedLanguage === "es" ? "selected" : ""}>Español</option>
+          <option value="fr" ${savedLanguage === "fr" ? "selected" : ""}>Français</option>
+          <option value="de" ${savedLanguage === "de" ? "selected" : ""}>Deutsch</option>
+          <option value="pt" ${savedLanguage === "pt" ? "selected" : ""}>Português</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  `
+
+  modal.classList.add("active")
+
+  document.getElementById("accountForm").onsubmit = (e) => {
+    e.preventDefault()
+    const language = document.getElementById("languageSelect").value
+    localStorage.setItem("language", language)
+    closeModal()
+  }
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.remove("active")
 }
 
 function loadAnalytics() {

@@ -75,10 +75,10 @@ Once opened, you can:
 - Data remains saved even after closing or reloading the page  
 
 ## Roadmap  
-- [x] Persistent storage using LocalStorage  
-- [ ] Multi-language support  
-- [ ] User authentication (future feature)
+- [ ] Multi-language support (in process)
+- [ ] Move export/import buttons to the account modal
 - [ ] Multiple export/import options
+- [ ] Add multiple market options, not only Steam
 
 ## Contributing  
 Contributions are welcome!  

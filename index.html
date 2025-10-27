@@ -3,23 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="HCS-Manager - Skin inventory management system" />
+  <meta name="description" content="HCS-Manager - Professional CS:GO skin inventory management system" />
   <link rel="icon" type="image/jpeg" href="assets/img/logo.webp" />
-  <title>HCS-Manager - Inventory</title>
+  <title>HCS-Manager - Home</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+  <link rel="stylesheet" href="css/pages/index.css">
 </head>
 <body>
   <nav class="navbar">
     <div class="nav-brand">
       <div class="logo-container">
-        <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-ERukcugNYB5g5Xcerw19Yoc4t9WdVF.webp" alt="HCS Logo" class="logo" />
+        <img src="assets/img/logo.webp" alt="HCS Logo" class="logo" />
       </div>
       <h1 class="app-title">HCS-Manager</h1>
     </div>
     
     <div class="nav-links">
-      <a href="index.html" class="nav-link active">Inventory</a>
+      <a href="index.html" class="nav-link active">Home</a>
+      <a href="dashboard.html" class="nav-link">Dashboard</a>
+      <a href="inventory.html" class="nav-link">Inventory</a>
       <a href="history.html" class="nav-link">History</a>
       <a href="analytics.html" class="nav-link">Analytics</a>
     </div>
@@ -28,111 +30,62 @@
       <button id="themeToggle" class="icon-btn" title="Toggle theme">
         <span class="theme-icon">🌙</span>
       </button>
-      <button id="exportDB" class="btn btn-secondary">Export</button>
-      <button id="importDB" class="btn btn-secondary">Import</button>
-      <button id="addSkin" class="btn btn-primary">+ Add Skin</button>
+      <button id="accountBtn" class="btn btn-secondary">Account</button>
     </div>
-    <input type="file" id="fileInput" style="display:none" accept=".json,.db" />
   </nav>
 
-  <main class="container">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <h3>Filters</h3>
-        <button class="btn-clear-filters" id="clearFilters">Clear All</button>
-      </div>
-      
-      <div class="filter-section">
-        <label class="filter-label">Type</label>
-        <select id="filterType" class="filter-select">
-          <option value="">All Types</option>
-          <option value="Knife">Knife</option>
-          <option value="Skin">Skin</option>
-          <option value="Case">Case</option>
-          <option value="Gloves">Gloves</option>
-          <option value="Agent">Agent</option>
-          <option value="Sticker">Sticker</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-
-      <div class="filter-section">
-        <label class="filter-label">Buy Price Range</label>
-        <div class="price-inputs">
-          <input type="number" id="filterMinPrice" placeholder="Min €" step="0.01" class="filter-input" />
-          <span class="price-separator">-</span>
-          <input type="number" id="filterMaxPrice" placeholder="Max €" step="0.01" class="filter-input" />
-        </div>
-      </div>
-
-      <div class="filter-section">
-        <label class="filter-label">Purchase Date</label>
-        <div class="date-inputs">
-          <input type="date" id="filterStartDate" class="filter-input" />
-          <span class="date-separator">to</span>
-          <input type="date" id="filterEndDate" class="filter-input" />
-        </div>
-      </div>
-    </aside>
-
-    <div class="main-content">
-      <div class="page-header">
-        <div class="header-content">
-          <h2>Skin Inventory</h2>
-          <p class="subtitle">Manage your CS:GO skin collection</p>
-        </div>
-        <div class="search-container">
-          <input type="text" id="searchInput" class="search-input" placeholder="Search by name or type..." />
-        </div>
-      </div>
-
-      <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
-        <span class="selection-count" id="selectedCount">0 items selected</span>
-        <button id="deleteSelected" class="btn btn-danger">Delete Selected</button>
-      </div>
-
-      <div class="table-container">
-        <table id="skinsTable">
-          <thead>
-            <tr>
-              <th style="width: 50px;">
-                <input type="checkbox" id="selectAll" />
-              </th>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Buy Price</th>
-              <th>Purchase Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="pagination-container">
-        <div class="pagination-info">
-          <span id="paginationInfo">Showing 0-0 of 0 items</span>
-        </div>
-        <div class="pagination-controls">
-          <label class="pagination-label">
-            Items per page:
-            <select id="itemsPerPage" class="pagination-select">
-              <option value="10" selected>10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="all">All</option>
-            </select>
-          </label>
-          <div class="pagination-buttons">
-            <button id="prevPage" class="pagination-btn" disabled>Previous</button>
-            <span id="pageNumbers" class="page-numbers"></span>
-            <button id="nextPage" class="pagination-btn" disabled>Next</button>
-          </div>
-        </div>
-      </div>
+  <main class="landing-hero">
+    <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-ERukcugNYB5g5Xcerw19Yoc4t9WdVF.webp" alt="HCS Logo" class="hero-logo" />
+    <h1 class="hero-title">HCS-Manager</h1>
+    <p class="hero-subtitle">Professional CS:GO skin inventory management with real-time Steam Market integration</p>
+    <div class="hero-cta">
+      <a href="dashboard.html" class="cta-button cta-primary">Get Started</a>
+      <a href="inventory.html" class="cta-button cta-secondary">View Inventory</a>
     </div>
   </main>
+
+  <section class="features-section">
+    <h2 style="text-align: center; font-size: 2rem; font-weight: 700; margin-bottom: 1rem;">Features</h2>
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 2rem;">Everything you need to manage your CS:GO inventory</p>
+    
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📦</div>
+        <h3 class="feature-title">Inventory Management</h3>
+        <p class="feature-description">Track all your CS:GO skins with detailed information including purchase prices and dates</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3 class="feature-title">Analytics Dashboard</h3>
+        <p class="feature-description">Visualize your profits, losses, and inventory value with interactive charts</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <h3 class="feature-title">Steam Integration</h3>
+        <p class="feature-description">Fetch real-time prices and data directly from Steam Market</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📈</div>
+        <h3 class="feature-title">Sales History</h3>
+        <p class="feature-description">Keep track of all your sales with profit calculations and performance metrics</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">💾</div>
+        <h3 class="feature-title">Import/Export</h3>
+        <p class="feature-description">Backup your data and transfer between devices with ease</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🌙</div>
+        <h3 class="feature-title">Dark Mode</h3>
+        <p class="feature-description">Beautiful dark and light themes for comfortable viewing</p>
+      </div>
+    </div>
+  </section>
 
   <div id="modal" class="modal">
     <div class="modal-content">
