@@ -3,10 +3,43 @@ let itemsPerPage = 10
 let filteredData = []
 const selectedItems = new Set()
 
+function showToast(message, type = "info") {
+  const container = document.getElementById("toastContainer")
+  if (!container) {
+    console.warn("Toast container not found")
+    return
+  }
+
+  const toast = document.createElement("div")
+  toast.className = `toast ${type}`
+
+  const icons = {
+    success: "✓",
+    error: "✕",
+    warning: "⚠",
+    info: "ℹ",
+  }
+
+  const icon = icons[type] || icons.info
+
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${message}</span>
+  `
+
+  container.appendChild(toast)
+
+  setTimeout(() => {
+    toast.classList.add("hiding")
+    setTimeout(() => toast.remove(), 300)
+  }, 3000)
+}
+
+window.showToast = showToast
+
 initialize()
 
 function initialize() {
-  initializeTheme()
   setupEventListeners()
 
   const itemsPerPageSelect = document.getElementById("itemsPerPage")
@@ -17,24 +50,8 @@ function initialize() {
   renderTable()
 }
 
-function initializeTheme() {
-  const savedTheme = localStorage.getItem("theme") || "dark"
-  document.documentElement.setAttribute("data-theme", savedTheme)
-  updateThemeIcon(savedTheme)
-}
-
-function updateThemeIcon(theme) {
-  const icon = document.querySelector(".theme-icon")
-  if (icon) {
-    icon.textContent = theme === "dark" ? "🌙" : "☀️"
-  }
-}
-
 function setupEventListeners() {
-  const themeToggle = document.getElementById("themeToggle")
   const clearBtn = document.getElementById("clearHistory")
-  const exportBtn = document.getElementById("exportDB")
-  const importBtn = document.getElementById("importDB")
   const fileInput = document.getElementById("fileInput")
   const modalClose = document.getElementById("modalClose")
   const modal = document.getElementById("modal")
@@ -49,10 +66,7 @@ function setupEventListeners() {
 
   const accountBtn = document.getElementById("accountBtn")
 
-  if (themeToggle) themeToggle.addEventListener("click", toggleTheme)
   if (clearBtn) clearBtn.addEventListener("click", confirmClearHistory)
-  if (exportBtn) exportBtn.addEventListener("click", exportData)
-  if (importBtn) importBtn.addEventListener("click", () => fileInput.click())
   if (fileInput) fileInput.addEventListener("change", importData)
   if (modalClose) modalClose.addEventListener("click", closeModal)
   if (searchInput)
@@ -115,14 +129,6 @@ function setupEventListeners() {
   })
 }
 
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute("data-theme")
-  const newTheme = currentTheme === "dark" ? "light" : "dark"
-  document.documentElement.setAttribute("data-theme", newTheme)
-  localStorage.setItem("theme", newTheme)
-  updateThemeIcon(newTheme)
-}
-
 function showAccountModal() {
   const modal = document.getElementById("modal")
   const title = document.getElementById("modalTitle")
@@ -143,6 +149,22 @@ function showAccountModal() {
           <option value="pt" ${savedLanguage === "pt" ? "selected" : ""}>Português</option>
         </select>
       </div>
+      
+      <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+        <label style="margin-bottom: 0.75rem; display: block; font-weight: 600;">Database Management</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary" id="exportDBModal" style="flex: 1;">
+            Export Data
+          </button>
+          <button type="button" class="btn btn-secondary" id="importDBModal" style="flex: 1;">
+            Import Data
+          </button>
+        </div>
+        <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+          Export your database to backup or import to restore data
+        </p>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -152,10 +174,27 @@ function showAccountModal() {
 
   modal.classList.add("active")
 
+  document.getElementById("exportDBModal").addEventListener("click", () => {
+    exportData()
+  })
+
+  document.getElementById("importDBModal").addEventListener("click", () => {
+    const fileInput = document.getElementById("fileInput")
+    if (fileInput) {
+      fileInput.click()
+    }
+  })
+
   document.getElementById("accountForm").onsubmit = (e) => {
     e.preventDefault()
     const language = document.getElementById("languageSelect").value
+    const previousLanguage = localStorage.getItem("language") || "en"
     localStorage.setItem("language", language)
+    if (language !== previousLanguage) {
+      showToast(`Language changed to ${language.toUpperCase()}`, "success")
+    } else {
+      showToast("Settings saved successfully", "success")
+    }
     closeModal()
   }
 }
@@ -255,6 +294,7 @@ function deleteSelectedItems() {
   selectedItems.clear()
   renderTable()
   closeModal()
+  showToast(`${idsToDelete.length} item${idsToDelete.length > 1 ? "s" : ""} deleted from history`, "success")
 }
 
 function renderTable() {
@@ -433,6 +473,7 @@ function deleteItem(id) {
   localStorage.setItem("skinsHistory", JSON.stringify(history))
   renderTable()
   closeModal()
+  showToast("Item deleted from history", "success")
 }
 
 async function restoreItem(id) {
@@ -440,14 +481,14 @@ async function restoreItem(id) {
   const item = history.find((h) => h.id === id)
 
   if (!item) {
-    alert("Item not found in history")
+    showToast("Item not found in history", "error")
     return
   }
 
   try {
     const savedData = localStorage.getItem("skinsDB")
     if (!savedData) {
-      alert("Database not found. Please refresh the page.")
+      showToast("Database not found. Please refresh the page.", "error")
       return
     }
 
@@ -475,10 +516,10 @@ async function restoreItem(id) {
     localStorage.setItem("skinsHistory", JSON.stringify(updatedHistory))
 
     renderTable()
-    alert(`${item.name} has been restored to inventory!`)
+    showToast(`${item.name} restored to inventory`, "success")
   } catch (error) {
     console.error("Restore error:", error)
-    alert("Failed to restore item. Please try again.")
+    showToast("Failed to restore item. Please try again.", "error")
   }
 }
 
@@ -487,7 +528,7 @@ async function exportData() {
   const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
 
   if (!savedData) {
-    alert("No database found to export")
+    showToast("No database found to export", "error")
     return
   }
 
@@ -503,6 +544,7 @@ async function exportData() {
   link.href = URL.createObjectURL(blob)
   link.download = `hcs-manager-full-${new Date().toISOString().split("T")[0]}.json`
   link.click()
+  showToast("Database exported successfully", "success")
 }
 
 async function importData(event) {
@@ -522,12 +564,12 @@ async function importData(event) {
         }
 
         renderTable()
-        alert("Import successful! Database and history have been restored. Please refresh the page.")
+        showToast("Import successful! Database and history restored.", "success")
       } else {
-        alert("Invalid file format")
+        showToast("Invalid file format", "error")
       }
     } catch (e) {
-      alert("Error importing file: " + e.message)
+      showToast("Error importing file: " + e.message, "error")
     }
   }
 
@@ -556,6 +598,7 @@ function clearHistory() {
   localStorage.removeItem("skinsHistory")
   renderTable()
   closeModal()
+  showToast("History cleared successfully", "success")
 }
 
 function closeModal() {

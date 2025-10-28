@@ -76,7 +76,7 @@ Once opened, you can:
 
 ## Roadmap  
 - [ ] Multi-language support (in process)
-- [ ] Move export/import buttons to the account modal
+- [x] Move export/import buttons to the account modal
 - [ ] Multiple export/import options
 - [ ] Add multiple market options, not only Steam
 

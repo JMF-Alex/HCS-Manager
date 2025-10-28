@@ -7,6 +7,7 @@
   <link rel="icon" type="image/jpeg" href="assets/img/logo.webp" />
   <title>HCS-Manager - History</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/utils/toast.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
 </head>
 <body>
@@ -30,8 +31,6 @@
       <button id="themeToggle" class="icon-btn" title="Toggle theme">
         <span class="theme-icon">🌙</span>
       </button>
-      <button id="exportDB" class="btn btn-secondary">Export</button>
-      <button id="importDB" class="btn btn-secondary">Import</button>
       <button id="accountBtn" class="btn btn-secondary">Account</button>
       <button id="clearHistory" class="btn btn-danger">Clear History</button>
     </div>
@@ -160,6 +159,9 @@
     </div>
   </div>
 
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="js/main.js"></script>
   <script src="js/pages/history.js"></script>
 </body>
 </html>

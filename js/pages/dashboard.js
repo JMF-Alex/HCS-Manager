@@ -25,103 +25,99 @@ async function initialize() {
     );`)
   }
 
-  initializeTheme()
   loadAnalytics()
 }
 
-function initializeTheme() {
-  const savedTheme = localStorage.getItem("theme") || "dark"
-  document.documentElement.setAttribute("data-theme", savedTheme)
-  updateThemeIcon(savedTheme)
-}
-
-function updateThemeIcon(theme) {
-  const icon = document.querySelector(".theme-icon")
-  if (icon) {
-    icon.textContent = theme === "dark" ? "🌙" : "☀️"
-  }
-}
-
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute("data-theme")
-  const newTheme = currentTheme === "dark" ? "light" : "dark"
-  document.documentElement.setAttribute("data-theme", newTheme)
-  localStorage.setItem("theme", newTheme)
-  updateThemeIcon(newTheme)
-}
-
-function showAccountModal() {
-  const modal = document.getElementById("modal")
-  const title = document.getElementById("modalTitle")
-  const body = document.getElementById("modalBody")
-  const savedLanguage = localStorage.getItem("language") || "en"
-  title.textContent = "Account Settings"
-  body.innerHTML = `
-    <form id="accountForm">
-      <div class="form-group">
-        <label>Language</label>
-        <select id="languageSelect" class="form-select">
-          <option value="en" ${savedLanguage === "en" ? "selected" : ""}>English</option>
-          <option value="es" ${savedLanguage === "es" ? "selected" : ""}>Español</option>
-          <option value="fr" ${savedLanguage === "fr" ? "selected" : ""}>Français</option>
-          <option value="de" ${savedLanguage === "de" ? "selected" : ""}>Deutsch</option>
-          <option value="pt" ${savedLanguage === "pt" ? "selected" : ""}>Português</option>
-        </select>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
-      </div>
-    </form>
-  `
-  modal.classList.add("active")
-  document.getElementById("accountForm").onsubmit = (e) => {
-    e.preventDefault()
-    const language = document.getElementById("languageSelect").value
-    localStorage.setItem("language", language)
-    closeModal()
-  }
-}
-
 function loadAnalytics() {
-  const inventoryResult = database.exec("SELECT * FROM skins");
-  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]");
+  const inventoryResult = database.exec("SELECT * FROM skins")
+  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
 
-  let totalInventoryValue = 0;
-  let totalItems = 0;
+  let totalInventoryValue = 0
+  let totalItems = 0
 
   if (inventoryResult && inventoryResult[0]) {
-    const rows = inventoryResult[0].values;
-    totalItems = rows.length;
+    const rows = inventoryResult[0].values
+    totalItems = rows.length
 
     for (const row of rows) {
-      const [id, name, type, buyPrice] = row;
-      totalInventoryValue += buyPrice;
+      const [id, name, type, buyPrice] = row
+      totalInventoryValue += buyPrice
     }
   }
 
-  let totalProfit = 0;
-  let itemsSold = 0;
+  let totalProfit = 0
+  let itemsSold = 0
 
   for (const item of history) {
-    const profit = item.sell_price - item.buy_price;
-    totalProfit += profit;
-    itemsSold++;
+    const profit = item.sell_price - item.buy_price
+    totalProfit += profit
+    itemsSold++
   }
 
-  document.getElementById("totalItems").textContent = totalItems;
-  document.getElementById("totalValue").textContent = `€${totalInventoryValue.toFixed(2)}`;
-  document.getElementById("itemsSold").textContent = itemsSold;
-  document.getElementById("totalProfit").textContent = `€${totalProfit.toFixed(2)}`;
+  document.getElementById("totalItems").textContent = totalItems
+  document.getElementById("totalValue").textContent = `€${totalInventoryValue.toFixed(2)}`
+  document.getElementById("itemsSold").textContent = itemsSold
+  document.getElementById("totalProfit").textContent = `€${totalProfit.toFixed(2)}`
 }
 
-function closeModal() {
-  document.getElementById("modal").classList.remove("active")
+function showToast(message, type = "info") {
+  const container = document.getElementById("toastContainer")
+  if (!container) {
+    console.warn("Toast container not found")
+    return
+  }
+
+  const toast = document.createElement("div")
+  toast.className = `toast ${type}`
+
+  const icons = {
+    success: "✓",
+    error: "✕",
+    warning: "⚠",
+    info: "ℹ",
+  }
+
+  const icon = icons[type] || icons.info
+
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${message}</span>
+  `
+
+  container.appendChild(toast)
+
+  setTimeout(() => {
+    toast.classList.add("hiding")
+    setTimeout(() => toast.remove(), 300)
+  }, 3000)
 }
 
-document.getElementById("themeToggle").addEventListener("click", toggleTheme)
-document.getElementById("accountBtn").addEventListener("click", showAccountModal)
-document.getElementById("modalClose").addEventListener("click", closeModal)
-document.getElementById("modal").addEventListener("click", (e) => {
-  if (e.target.id === "modal") closeModal()
-})
+window.showToast = showToast
+
+function exportDatabase() {
+  try {
+    const savedData = localStorage.getItem("skinsDB")
+    const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
+
+    if (!savedData) {
+      showToast("No database found to export", "error")
+      return
+    }
+
+    const fullExport = {
+      database: JSON.parse(savedData),
+      history: history,
+      exportDate: new Date().toISOString(),
+      version: "1.0",
+    }
+
+    const blob = new Blob([JSON.stringify(fullExport, null, 2)], { type: "application/json" })
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = `hcs-manager-full-${new Date().toISOString().split("T")[0]}.json`
+    link.click()
+  } catch (error) {
+    console.error("Export error:", error)
+    showToast("Failed to export database", "error")
+  }
+}
