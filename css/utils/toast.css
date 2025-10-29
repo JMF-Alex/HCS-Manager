@@ -10,7 +10,7 @@
 }
 
 .toast {
-  background: var(--card-bg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 16px 20px;
@@ -66,22 +66,22 @@
 
 .toast.success .toast-icon {
   background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  color: var(--accent-success);
 }
 
 .toast.error .toast-icon {
   background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  color: var(--accent-danger);
 }
 
 .toast.info .toast-icon {
   background: rgba(99, 102, 241, 0.1);
-  color: #6366f1;
+  color: var(--accent-primary);
 }
 
 .toast.warning .toast-icon {
   background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  color: var(--accent-warning);
 }
 
 .toast-content {
@@ -121,7 +121,7 @@
 }
 
 .toast-close:hover {
-  background: var(--hover-bg);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 

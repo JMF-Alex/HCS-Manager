@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="HCS-Manager - Skin inventory management system" />
-  <link rel="icon" type="image/jpeg" href="assets/img/logo.webp" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HCS-Manager - Skin inventory management system">
+  <link rel="icon" type="image/jpeg" href="assets/img/logo.webp">
   <title>HCS-Manager - Inventory</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/components/sidebar.css">
+  <link rel="stylesheet" href="css/components/forms.css">
+  <link rel="stylesheet" href="css/components/tables.css">
+  <link rel="stylesheet" href="css/components/pagination.css">
+  <link rel="stylesheet" href="css/components/stats.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
 </head>
 <body>
-  <nav class="navbar">
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
     <div class="nav-brand">
       <div class="logo-container">
-        <img src="assets/img/logo.webp" alt="HCS Logo" class="logo" />
+        <img src="assets/img/logo.webp" alt="HCS Logo" class="logo">
       </div>
       <h1 class="app-title">HCS-Manager</h1>
     </div>
@@ -21,31 +26,30 @@
     <div class="nav-links">
       <a href="index.html" class="nav-link">Home</a>
       <a href="dashboard.html" class="nav-link">Dashboard</a>
-      <a href="inventory.html" class="nav-link active">Inventory</a>
+      <a href="inventory.html" class="nav-link active" aria-current="page">Inventory</a>
       <a href="history.html" class="nav-link">History</a>
       <a href="analytics.html" class="nav-link">Analytics</a>
     </div>
 
     <div class="nav-actions">
-      <button id="themeToggle" class="icon-btn" title="Toggle theme">
-        <span class="theme-icon">🌙</span>
+      <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle dark/light theme">
+        <span class="theme-icon" aria-hidden="true">🌙</span>
       </button>
       <button id="accountBtn" class="btn btn-secondary">Account</button>
       <button id="addSkin" class="btn btn-primary">+ Add Skin</button>
     </div>
-    <input type="file" id="fileInput" style="display:none" accept=".json,.db" />
+    <input type="file" id="fileInput" style="display:none" accept=".json,.db" aria-hidden="true">
   </nav>
 
-
   <main class="container">
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar" role="complementary" aria-label="Filters">
       <div class="sidebar-header">
         <h3>Filters</h3>
         <button class="btn-clear-filters" id="clearFilters">Clear All</button>
       </div>
       
       <div class="filter-section">
-        <label class="filter-label">Type</label>
+        <label class="filter-label" for="filterType">Type</label>
         <select id="filterType" class="filter-select">
           <option value="">All Types</option>
           <option value="Knife">Knife</option>
@@ -59,20 +63,20 @@
       </div>
 
       <div class="filter-section">
-        <label class="filter-label">Buy Price Range</label>
+        <label class="filter-label" for="filterMinPrice">Buy Price Range</label>
         <div class="price-inputs">
-          <input type="number" id="filterMinPrice" placeholder="Min €" step="0.01" class="filter-input" />
+          <input type="number" id="filterMinPrice" placeholder="Min €" step="0.01" class="filter-input" aria-label="Minimum price">
           <span class="price-separator">-</span>
-          <input type="number" id="filterMaxPrice" placeholder="Max €" step="0.01" class="filter-input" />
+          <input type="number" id="filterMaxPrice" placeholder="Max €" step="0.01" class="filter-input" aria-label="Maximum price">
         </div>
       </div>
 
       <div class="filter-section">
-        <label class="filter-label">Purchase Date</label>
+        <label class="filter-label" for="filterStartDate">Purchase Date</label>
         <div class="date-inputs">
-          <input type="date" id="filterStartDate" class="filter-input" />
+          <input type="date" id="filterStartDate" class="filter-input" aria-label="Start date">
           <span class="date-separator">to</span>
-          <input type="date" id="filterEndDate" class="filter-input" />
+          <input type="date" id="filterEndDate" class="filter-input" aria-label="End date">
         </div>
       </div>
     </aside>
@@ -84,12 +88,12 @@
           <p class="subtitle">Manage your CS:GO skin collection</p>
         </div>
         <div class="search-container">
-          <input type="text" id="searchInput" class="search-input" placeholder="Search by name or type..." />
+          <input type="text" id="searchInput" class="search-input" placeholder="Search by name or type..." aria-label="Search items">
         </div>
       </div>
 
-      <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
-        <span class="selection-count" id="selectedCount">0 items selected</span>
+      <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;" role="toolbar" aria-label="Bulk actions">
+        <span class="selection-count" id="selectedCount" aria-live="polite">0 items selected</span>
         <button id="deleteSelected" class="btn btn-danger">Delete Selected</button>
       </div>
 
@@ -98,7 +102,7 @@
           <thead>
             <tr>
               <th style="width: 50px;">
-                <input type="checkbox" id="selectAll" />
+                <input type="checkbox" id="selectAll" aria-label="Select all items">
               </th>
               <th>Name</th>
               <th>Type</th>
@@ -113,12 +117,12 @@
         </table>
       </div>
 
-      <div class="pagination-container">
+      <nav class="pagination-container" aria-label="Pagination">
         <div class="pagination-info">
           <span id="paginationInfo">Showing 0-0 of 0 items</span>
         </div>
         <div class="pagination-controls">
-          <label class="pagination-label">
+          <label class="pagination-label" for="itemsPerPage">
             Items per page:
             <select id="itemsPerPage" class="pagination-select">
               <option value="10" selected>10</option>
@@ -134,21 +138,21 @@
             <button id="nextPage" class="pagination-btn" disabled>Next</button>
           </div>
         </div>
-      </div>
+      </nav>
     </div>
   </main>
 
-  <div id="modal" class="modal">
+  <div id="modal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle"></h2>
-        <button class="modal-close" id="modalClose">&times;</button>
+        <button class="modal-close" id="modalClose" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
 
-  <div id="toastContainer" class="toast-container"></div>
+  <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
 
   <script src="js/main.js"></script>
   <script src="js/pages/inventory.js"></script>

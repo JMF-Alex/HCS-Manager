@@ -1,71 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="HCS-Manager - Dashboard" />
-  <link rel="icon" type="image/jpeg" href="assets/img/logo.webp" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HCS-Manager - Dashboard">
+  <link rel="icon" type="image/jpeg" href="assets/img/logo.webp">
   <title>HCS-Manager - Dashboard</title>
+  <!-- Import base styles, stats component, and page-specific CSS -->
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/components/stats.css">
   <link rel="stylesheet" href="css/pages/dashboard.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
 </head>
 <body>
-  <nav class="navbar">
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
     <div class="nav-brand">
       <div class="logo-container">
-        <img src="assets/img/logo.webp" alt="HCS Logo" class="logo" />
+        <img src="assets/img/logo.webp" alt="HCS Logo" class="logo">
       </div>
       <h1 class="app-title">HCS-Manager</h1>
     </div>
     
     <div class="nav-links">
       <a href="index.html" class="nav-link">Home</a>
-      <a href="dashboard.html" class="nav-link active">Dashboard</a>
+      <a href="dashboard.html" class="nav-link active" aria-current="page">Dashboard</a>
       <a href="inventory.html" class="nav-link">Inventory</a>
       <a href="history.html" class="nav-link">History</a>
       <a href="analytics.html" class="nav-link">Analytics</a>
     </div>
 
     <div class="nav-actions">
-      <button id="themeToggle" class="icon-btn" title="Toggle theme">
-        <span class="theme-icon">🌙</span>
+      <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle dark/light theme">
+        <span class="theme-icon" aria-hidden="true">🌙</span>
       </button>
       <button id="accountBtn" class="btn btn-secondary">Account</button>
     </div>
   </nav>
 
   <main class="dashboard-container">
-    <div class="dashboard-header">
-      <h1>Welcome to HCS-Manager</h1>
+    <header class="dashboard-header">
+      <h2>Welcome to HCS-Manager</h2>
       <p>Manage your CS:GO skin inventory with ease</p>
-    </div>
+    </header>
 
     <div class="dashboard-grid">
       <a href="inventory.html" class="dashboard-card">
-        <div class="dashboard-card-icon">📦</div>
-        <h2 class="dashboard-card-title">Inventory</h2>
+        <div class="dashboard-card-icon" aria-hidden="true">📦</div>
+        <h3 class="dashboard-card-title">Inventory</h3>
         <p class="dashboard-card-description">View and manage all your CS:GO skins in one place</p>
       </a>
 
       <a href="history.html" class="dashboard-card">
-        <div class="dashboard-card-icon">📈</div>
-        <h2 class="dashboard-card-title">Sales History</h2>
+        <div class="dashboard-card-icon" aria-hidden="true">📈</div>
+        <h3 class="dashboard-card-title">Sales History</h3>
         <p class="dashboard-card-description">Track all your past sales and profits</p>
       </a>
 
       <a href="analytics.html" class="dashboard-card">
-        <div class="dashboard-card-icon">📊</div>
-        <h2 class="dashboard-card-title">Analytics</h2>
+        <div class="dashboard-card-icon" aria-hidden="true">📊</div>
+        <h3 class="dashboard-card-title">Analytics</h3>
         <p class="dashboard-card-description">Visualize your performance with detailed charts</p>
       </a>
     </div>
 
-    <div class="dashboard-header">
-        <h2>Statistics Overview</h2>
-        <p>Overview of your inventory and sales performance</p>
-    </div>
+    <header class="dashboard-header">
+      <h2>Statistics Overview</h2>
+      <p>Overview of your inventory and sales performance</p>
+    </header>
 
-    <div class="stats-overview">
+    <section class="stats-overview" aria-label="Statistics overview">
       <div class="overview-card">
         <div class="overview-label">Total Items</div>
         <div class="overview-value" id="totalItems">0</div>
@@ -85,22 +88,21 @@
         <div class="overview-label">Total Profit</div>
         <div class="overview-value" id="totalProfit">€0.00</div>
       </div>
-    </div>
+    </section>
   </main>
 
-  <div id="modal" class="modal">
+  <div id="modal" class="modal" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle"></h2>
-        <button class="modal-close" id="modalClose">&times;</button>
+        <button class="modal-close" id="modalClose" aria-label="Close modal">&times;</button>
       </div>
       <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
 
-  <div id="toastContainer" class="toast-container"></div>
+  <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
   <script src="js/main.js"></script>
   <script src="js/pages/dashboard.js"></script>
 </body>
