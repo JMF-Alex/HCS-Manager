@@ -286,7 +286,7 @@ function renderTable() {
   if (!result || !result[0]) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="empty-state">
+        <td colspan="8" class="empty-state">
           <div class="empty-state-icon">📦</div>
           <div class="empty-state-text">No Skins in Inventory</div>
           <div class="empty-state-subtext">Add your first skin to get started</div>
@@ -318,12 +318,38 @@ function renderTable() {
     return true
   })
 
-  filteredData = rows
+  const groupedItems = new Map()
+  rows.forEach((row) => {
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
 
-  if (rows.length === 0) {
+    const groupKey = `${name}|${buyPrice}`
+
+    if (groupedItems.has(groupKey)) {
+      const existing = groupedItems.get(groupKey)
+      existing.quantity += 1
+      existing.ids.push(id)
+      existing.totalValue += buyPrice
+    } else {
+      groupedItems.set(groupKey, {
+        ids: [id],
+        name,
+        type,
+        buyPrice,
+        purchaseDate,
+        steamLink,
+        quantity: 1,
+        totalValue: buyPrice,
+      })
+    }
+  })
+
+  const groupedRows = Array.from(groupedItems.values())
+  filteredData = groupedRows
+
+  if (groupedRows.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="empty-state">
+        <td colspan="8" class="empty-state">
           <div class="empty-state-icon">🔍</div>
           <div class="empty-state-text">No Results Found</div>
           <div class="empty-state-subtext">Try adjusting your filters</div>
@@ -334,19 +360,19 @@ function renderTable() {
     return
   }
 
-  const totalItems = rows.length
-  let paginatedRows = rows
+  const totalItems = groupedRows.length
+  let paginatedRows = groupedRows
   let startIndex = 0
   let endIndex = totalItems
 
   if (itemsPerPage !== "all") {
     startIndex = (currentPage - 1) * itemsPerPage
     endIndex = Math.min(startIndex + itemsPerPage, totalItems)
-    paginatedRows = rows.slice(startIndex, endIndex)
+    paginatedRows = groupedRows.slice(startIndex, endIndex)
   }
 
-  for (const row of paginatedRows) {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+  for (const item of paginatedRows) {
+    const { ids, name, type, buyPrice, purchaseDate, steamLink, quantity, totalValue } = item
     const formattedDate = formatDate(purchaseDate)
 
     const tr = document.createElement("tr")
@@ -355,21 +381,23 @@ function renderTable() {
       : `<strong>${escapeHtml(name)}</strong>`
 
     const infoButton = steamLink
-      ? `<button class="action-btn info" onclick="showInfoModal(${id}, '${escapeHtml(steamLink).replace(/'/g, "\\'")}', '${escapeHtml(name).replace(/'/g, "\\'")}', '${purchaseDate}')">Info</button>`
+      ? `<button class="action-btn info" onclick="showInfoModal(${ids[0]}, '${escapeHtml(steamLink).replace(/'/g, "\\'")}', '${escapeHtml(name).replace(/'/g, "\\'")}', '${purchaseDate}')">Info</button>`
       : ""
 
     tr.innerHTML = `
       <td>
-        <input type="checkbox" class="checkbox-input item-checkbox" data-id="${id}" />
+        <input type="checkbox" class="checkbox-input item-checkbox" data-ids='${JSON.stringify(ids)}' />
       </td>
       <td>${nameDisplay}</td>
       <td>${escapeHtml(type)}</td>
       <td>€${buyPrice.toFixed(2)}</td>
+      <td style="font-weight: 600;">${quantity}</td>
+      <td>€${totalValue.toFixed(2)}</td>
       <td style="color: var(--text-muted); font-size: 0.875rem;">${formattedDate}</td>
       <td>
         ${infoButton}
-        <button class="action-btn sell" onclick="showSellModal(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')">Sell</button>
-        <button class="action-btn delete" style="background-color: #dc2626; color: white;" onclick="confirmDeleteItem(${id}, '${escapeHtml(name).replace(/'/g, "\\'")}')">Delete</button>
+        <button class="action-btn sell" onclick='showSellModal(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Sell</button>
+        <button class="action-btn delete" style="background-color: #dc2626; color: white;" onclick='confirmDeleteItem(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Delete</button>
       </td>
     `
     tbody.appendChild(tr)
@@ -395,9 +423,9 @@ function handleSelectAll(e) {
 
   visibleCheckboxes.forEach((checkbox) => {
     checkbox.checked = isChecked
-    const id = Number.parseInt(checkbox.dataset.id)
+    const ids = JSON.parse(checkbox.dataset.ids)
     if (isChecked) {
-      selectedItems.add(id)
+      ids.forEach((id) => selectedItems.add(id))
     }
   })
 
@@ -405,11 +433,11 @@ function handleSelectAll(e) {
 }
 
 function handleItemCheckbox(e) {
-  const id = Number.parseInt(e.target.dataset.id)
+  const ids = JSON.parse(e.target.dataset.ids)
   if (e.target.checked) {
-    selectedItems.add(id)
+    ids.forEach((id) => selectedItems.add(id))
   } else {
-    selectedItems.delete(id)
+    ids.forEach((id) => selectedItems.delete(id))
   }
   updateBulkActionsBar()
 
@@ -461,29 +489,118 @@ function deleteSelectedItems() {
   showToast(`${idsToDelete.length} item${idsToDelete.length > 1 ? "s" : ""} deleted successfully`, "success")
 }
 
-function confirmDeleteItem(id, name) {
+function confirmDeleteItem(ids, name, quantity) {
   const modal = document.getElementById("modal")
   const title = document.getElementById("modalTitle")
   const body = document.getElementById("modalBody")
 
+  const quantityText = quantity > 1 ? ` (${quantity} items)` : ""
   title.textContent = "Delete Item"
   body.innerHTML = `
-    <p class="confirm-text">Are you sure you want to delete <strong>${name}</strong>? This action cannot be undone.</p>
+    <p class="confirm-text">Are you sure you want to delete <strong>${name}${quantityText}</strong>? This action cannot be undone.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="deleteItem(${id})">Delete</button>
+      <button class="btn btn-danger" onclick='deleteItem(${JSON.stringify(ids)})'>Delete</button>
     </div>
   `
 
   modal.classList.add("active")
 }
 
-function deleteItem(id) {
-  database.run("DELETE FROM skins WHERE id = ?", [id])
+function deleteItem(ids) {
+  const placeholders = ids.map(() => "?").join(",")
+  database.run(`DELETE FROM skins WHERE id IN (${placeholders})`, ids)
   saveDatabase()
   renderTable()
   closeModal()
-  showToast("Item deleted successfully", "success")
+  const itemText = ids.length > 1 ? `${ids.length} items` : "Item"
+  showToast(`${itemText} deleted successfully`, "success")
+}
+
+function showSellModal(ids, name, quantity) {
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  title.textContent = "Sell Skin"
+
+  const quantitySelector =
+    quantity > 1
+      ? `
+    <div class="form-group">
+      <label>Quantity to Sell</label>
+      <input type="number" id="sellQuantity" min="1" max="${quantity}" value="${quantity}" required />
+      <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">Available: ${quantity}</p>
+    </div>
+  `
+      : `<input type="hidden" id="sellQuantity" value="1" />`
+
+  body.innerHTML = `
+    <form id="sellForm">
+      <p class="confirm-text">Enter the sell price for <strong>${escapeHtml(name)}</strong></p>
+      ${quantitySelector}
+      <div class="form-group">
+        <label>Sell Price per Item (€)</label>
+        <input type="number" id="sellPrice" step="0.01" required placeholder="0.00" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Sell</button>
+      </div>
+    </form>
+  `
+
+  modal.classList.add("active")
+
+  document.getElementById("sellForm").onsubmit = (e) => {
+    e.preventDefault()
+    sellSkin(ids, name)
+  }
+}
+
+function sellSkin(ids, name) {
+  const sellPrice = Number.parseFloat(document.getElementById("sellPrice").value)
+  const quantityToSell = Number.parseInt(document.getElementById("sellQuantity").value)
+
+  const idsToSell = ids.slice(0, quantityToSell)
+  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
+
+  idsToSell.forEach((id) => {
+    const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
+    if (!result || !result[0]) return
+
+    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
+
+    history.push({
+      id: Date.now() + Math.random(),
+      name: skinName,
+      type: type,
+      buy_price: buyPrice,
+      sell_price: sellPrice,
+      purchase_date: purchaseDate,
+      sale_date: new Date().toISOString().split("T")[0],
+      profit: sellPrice - buyPrice,
+      steam_link: steamLink,
+    })
+  })
+
+  localStorage.setItem("skinsHistory", JSON.stringify(history))
+
+  const placeholders = idsToSell.map(() => "?").join(",")
+  database.run(`DELETE FROM skins WHERE id IN (${placeholders})`, idsToSell)
+  saveDatabase()
+  renderTable()
+  closeModal()
+
+  const result = database.exec("SELECT buy_price FROM skins WHERE id = ?", [idsToSell[0]])
+  const buyPrice = result && result[0] ? result[0].values[0][0] : 0
+  const profit = sellPrice - buyPrice
+  const profitText = profit >= 0 ? `+€${profit.toFixed(2)}` : `-€${Math.abs(profit).toFixed(2)}`
+  const quantityText = quantityToSell > 1 ? ` (${quantityToSell}x)` : ""
+  showToast(
+    `${name}${quantityText} sold for €${sellPrice.toFixed(2)} (${profitText})`,
+    profit >= 0 ? "success" : "warning",
+  )
 }
 
 function updatePaginationInfo(start, end, total) {
@@ -976,68 +1093,4 @@ async function showInfoModal(id, steamLink, savedName, purchaseDate) {
       </div>
     `
   }
-}
-
-function showSellModal(id, name) {
-  const modal = document.getElementById("modal")
-  const title = document.getElementById("modalTitle")
-  const body = document.getElementById("modalBody")
-
-  title.textContent = "Sell Skin"
-  body.innerHTML = `
-    <form id="sellForm">
-      <p class="confirm-text">Enter the sell price for <strong>${escapeHtml(name)}</strong></p>
-      <div class="form-group">
-        <label>Sell Price (€)</label>
-        <input type="number" id="sellPrice" step="0.01" required placeholder="0.00" />
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Sell</button>
-      </div>
-    </form>
-  `
-
-  modal.classList.add("active")
-
-  document.getElementById("sellForm").onsubmit = (e) => {
-    e.preventDefault()
-    sellSkin(id, name)
-  }
-}
-
-function sellSkin(id, name) {
-  const sellPrice = Number.parseFloat(document.getElementById("sellPrice").value)
-
-  const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
-  if (!result || !result[0]) {
-    showToast("Skin not found", "error")
-    closeModal()
-    return
-  }
-
-  const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
-
-  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
-  history.push({
-    id: Date.now(),
-    name: skinName,
-    type: type,
-    buy_price: buyPrice,
-    sell_price: sellPrice,
-    purchase_date: purchaseDate,
-    sell_date: new Date().toISOString().split("T")[0],
-    profit: sellPrice - buyPrice,
-    steam_link: steamLink,
-  })
-  localStorage.setItem("skinsHistory", JSON.stringify(history))
-
-  database.run("DELETE FROM skins WHERE id = ?", [id])
-  saveDatabase()
-  renderTable()
-  closeModal()
-
-  const profit = sellPrice - buyPrice
-  const profitText = profit >= 0 ? `+€${profit.toFixed(2)}` : `-€${Math.abs(profit).toFixed(2)}`
-  showToast(`${name} sold for €${sellPrice.toFixed(2)} (${profitText})`, profit >= 0 ? "success" : "warning")
 }

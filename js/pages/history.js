@@ -229,9 +229,9 @@ function handleSelectAll(e) {
 
   visibleCheckboxes.forEach((checkbox) => {
     checkbox.checked = isChecked
-    const id = Number.parseInt(checkbox.dataset.id)
+    const ids = JSON.parse(checkbox.dataset.ids)
     if (isChecked) {
-      selectedItems.add(id)
+      ids.forEach((id) => selectedItems.add(id))
     }
   })
 
@@ -239,11 +239,11 @@ function handleSelectAll(e) {
 }
 
 function handleItemCheckbox(e) {
-  const id = Number.parseInt(e.target.dataset.id)
+  const ids = JSON.parse(e.target.dataset.ids)
   if (e.target.checked) {
-    selectedItems.add(id)
+    ids.forEach((id) => selectedItems.add(id))
   } else {
-    selectedItems.delete(id)
+    ids.forEach((id) => selectedItems.delete(id))
   }
   updateBulkActionsBar()
 
@@ -294,7 +294,8 @@ function deleteSelectedItems() {
   selectedItems.clear()
   renderTable()
   closeModal()
-  showToast(`${idsToDelete.length} item${idsToDelete.length > 1 ? "s" : ""} deleted from history`, "success")
+  const itemText = idsToDelete.length > 1 ? `${idsToDelete.length} items` : "Item"
+  showToast(`${itemText} deleted from history`, "success")
 }
 
 function renderTable() {
@@ -342,7 +343,42 @@ function renderTable() {
 
   filteredData = filteredData.reverse()
 
-  if (filteredData.length === 0) {
+  const groupedItems = new Map()
+  filteredData.forEach((item) => {
+    const groupKey = `${item.name}|${item.buy_price}|${item.sell_price}`
+
+    if (groupedItems.has(groupKey)) {
+      const existing = groupedItems.get(groupKey)
+      existing.quantity += 1
+      existing.ids.push(item.id)
+      existing.totalBuyPrice += item.buy_price
+      existing.totalSellPrice += item.sell_price
+      existing.totalProfit += item.sell_price - item.buy_price
+      if (item.sale_date > existing.sale_date) {
+        existing.sale_date = item.sale_date
+      }
+    } else {
+      groupedItems.set(groupKey, {
+        ids: [item.id],
+        name: item.name,
+        type: item.type,
+        buy_price: item.buy_price,
+        sell_price: item.sell_price,
+        totalBuyPrice: item.buy_price,
+        totalSellPrice: item.sell_price,
+        totalProfit: item.sell_price - item.buy_price,
+        purchase_date: item.purchase_date,
+        sale_date: item.sale_date,
+        steam_link: item.steam_link,
+        quantity: 1,
+      })
+    }
+  })
+
+  const groupedData = Array.from(groupedItems.values())
+  filteredData = groupedData
+
+  if (groupedData.length === 0) {
     const hasFilters = Object.values(filters).some((v) => v !== "")
     const message = hasFilters
       ? '<div class="empty-state-icon">🔍</div><div class="empty-state-text">No Results Found</div><div class="empty-state-subtext">Try adjusting your filters</div>'
@@ -350,53 +386,56 @@ function renderTable() {
 
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" class="empty-state">${message}</td>
+        <td colspan="11" class="empty-state">${message}</td>
       </tr>`
     updatePaginationInfo(0, 0, 0)
     updatePaginationButtons()
     return
   }
 
-  const totalItems = filteredData.length
-  let paginatedItems = filteredData
+  const totalItems = groupedData.length
+  let paginatedItems = groupedData
   let startIndex = 0
   let endIndex = totalItems
 
   if (itemsPerPage !== "all") {
     startIndex = (currentPage - 1) * itemsPerPage
     endIndex = Math.min(startIndex + itemsPerPage, totalItems)
-    paginatedItems = filteredData.slice(startIndex, endIndex)
+    paginatedItems = groupedData.slice(startIndex, endIndex)
   }
 
   paginatedItems.forEach((item) => {
-    const profit = item.sell_price - item.buy_price
-    const percentage = ((profit / item.buy_price) * 100).toFixed(2)
+    const { ids, name, type, buy_price, sell_price, totalProfit, purchase_date, sale_date, steam_link, quantity } = item
+
+    const profit = sell_price - buy_price
+    const percentage = ((profit / buy_price) * 100).toFixed(2)
     const profitClass = profit >= 0 ? "profit-positive" : "profit-negative"
 
-    const purchaseDate = formatDate(item.purchase_date)
-    const saleDate = formatDate(item.sale_date)
+    const purchaseDate = formatDate(purchase_date)
+    const saleDate = formatDate(sale_date)
 
-    const nameDisplay = item.steam_link
-      ? `<a href="${escapeHtml(item.steam_link)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">${escapeHtml(item.name)}</a>`
-      : `<strong>${escapeHtml(item.name)}</strong>`
+    const nameDisplay = steam_link
+      ? `<a href="${escapeHtml(steam_link)}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">${escapeHtml(name)}</a>`
+      : `<strong>${escapeHtml(name)}</strong>`
 
     const tr = document.createElement("tr")
     tr.innerHTML = `
       <td>
-        <input type="checkbox" class="checkbox-input item-checkbox" data-id="${item.id}" />
+        <input type="checkbox" class="checkbox-input item-checkbox" data-ids='${JSON.stringify(ids)}' />
       </td>
       <td>${nameDisplay}</td>
-      <td>${escapeHtml(item.type)}</td>
-      <td>€${item.buy_price.toFixed(2)}</td>
-      <td>€${item.sell_price.toFixed(2)}</td>
+      <td>${escapeHtml(type)}</td>
+      <td>€${buy_price.toFixed(2)}</td>
+      <td>€${sell_price.toFixed(2)}</td>
       <td class="${profitClass}">€${profit.toFixed(2)}</td>
       <td class="${profitClass}">${percentage}%</td>
+      <td style="font-weight: 600;">${quantity}</td>
       <td style="color: var(--text-muted); font-size: 0.875rem;">${purchaseDate}</td>
       <td style="color: var(--text-muted); font-size: 0.875rem;">${saleDate}</td>
       <td class="actions-cell">
         <div class="actions-wrapper">
-          <button class="action-btn restore" onclick="restoreItem(${item.id})">Restore</button>
-          <button class="action-btn delete" onclick="confirmDeleteItem(${item.id}, '${escapeHtml(item.name).replace(/'/g, "\\'")}')">Delete</button>
+          <button class="action-btn restore" onclick='restoreItem(${JSON.stringify(ids)}, ${quantity})'>Restore</button>
+          <button class="action-btn delete" onclick='confirmDeleteItem(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Delete</button>
         </div>
       </td>
     `
@@ -450,38 +489,40 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
-function confirmDeleteItem(id, name) {
+function confirmDeleteItem(ids, name, quantity) {
   const modal = document.getElementById("modal")
   const title = document.getElementById("modalTitle")
   const body = document.getElementById("modalBody")
 
+  const quantityText = quantity > 1 ? ` (${quantity} items)` : ""
   title.textContent = "Delete Item"
   body.innerHTML = `
-    <p class="confirm-text">Are you sure you want to delete <strong>${name}</strong> from history? This action cannot be undone.</p>
+    <p class="confirm-text">Are you sure you want to delete <strong>${name}${quantityText}</strong> from history? This action cannot be undone.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="deleteItem(${id})">Delete</button>
+      <button class="btn btn-danger" onclick='deleteItem(${JSON.stringify(ids)})'>Delete</button>
     </div>
   `
 
   modal.classList.add("active")
 }
 
-function deleteItem(id) {
+function deleteItem(ids) {
   let history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
-  history = history.filter((item) => item.id !== id)
+  history = history.filter((item) => !ids.includes(item.id))
   localStorage.setItem("skinsHistory", JSON.stringify(history))
   renderTable()
   closeModal()
-  showToast("Item deleted from history", "success")
+  const itemText = ids.length > 1 ? `${ids.length} items` : "Item"
+  showToast(`${itemText} deleted from history`, "success")
 }
 
-async function restoreItem(id) {
+async function restoreItem(ids, quantity) {
   const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
-  const item = history.find((h) => h.id === id)
+  const itemsToRestore = history.filter((h) => ids.includes(h.id))
 
-  if (!item) {
-    showToast("Item not found in history", "error")
+  if (itemsToRestore.length === 0) {
+    showToast("Items not found in history", "error")
     return
   }
 
@@ -500,26 +541,26 @@ async function restoreItem(id) {
     const dataArray = new Uint8Array(JSON.parse(savedData))
     const database = new sqlModule.Database(dataArray)
 
-    database.run("INSERT INTO skins (name, type, buy_price, sell_price, purchase_date) VALUES (?, ?, ?, ?, ?)", [
-      item.name,
-      item.type,
-      item.buy_price,
-      0,
-      item.purchase_date || null,
-    ])
+    itemsToRestore.forEach((item) => {
+      database.run(
+        "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link) VALUES (?, ?, ?, ?, ?, ?)",
+        [item.name, item.type, item.buy_price, 0, item.purchase_date || null, item.steam_link || null],
+      )
+    })
 
     const exportedData = database.export()
     const newDataArray = Array.from(exportedData)
     localStorage.setItem("skinsDB", JSON.stringify(newDataArray))
 
-    const updatedHistory = history.filter((h) => h.id !== id)
+    const updatedHistory = history.filter((h) => !ids.includes(h.id))
     localStorage.setItem("skinsHistory", JSON.stringify(updatedHistory))
 
     renderTable()
-    showToast(`${item.name} restored to inventory`, "success")
+    const itemText = quantity > 1 ? `${quantity} items` : itemsToRestore[0].name
+    showToast(`${itemText} restored to inventory`, "success")
   } catch (error) {
     console.error("Restore error:", error)
-    showToast("Failed to restore item. Please try again.", "error")
+    showToast("Failed to restore items. Please try again.", "error")
   }
 }
 
