@@ -280,6 +280,7 @@ function renderGrid() {
         purchase_date: item.purchase_date,
         sale_date: item.sale_date,
         steam_link: item.steam_link,
+        platform: item.platform || "Steam",
         quantity: 1,
       })
     }
@@ -470,6 +471,7 @@ function renderList() {
         purchase_date: item.purchase_date,
         sale_date: item.sale_date,
         steam_link: item.steam_link,
+        platform: item.platform || "Steam",
         quantity: 1,
       })
     }
@@ -643,8 +645,16 @@ async function restoreItem(ids, quantity) {
 
     itemsToRestore.forEach((item) => {
       database.run(
-        "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link) VALUES (?, ?, ?, ?, ?, ?)",
-        [item.name, item.type, item.buy_price, 0, item.purchase_date || null, item.steam_link || null],
+        "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link, platform) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+          item.name,
+          item.type,
+          item.buy_price,
+          0,
+          item.purchase_date || null,
+          item.steam_link || null,
+          item.platform || "Steam",
+        ],
       )
     })
 

@@ -20,6 +20,12 @@ async function initialize() {
       database = new sqlModule.Database(dataArray)
 
       try {
+        database.exec("SELECT platform FROM skins LIMIT 1")
+      } catch (e) {
+        database.run("ALTER TABLE skins ADD COLUMN platform TEXT DEFAULT 'Steam'")
+      }
+
+      try {
         database.exec("SELECT steam_link FROM skins LIMIT 1")
       } catch (e) {
         database.run("ALTER TABLE skins ADD COLUMN steam_link TEXT")
@@ -39,7 +45,8 @@ async function initialize() {
         buy_price REAL, 
         sell_price REAL,
         purchase_date TEXT,
-        steam_link TEXT
+        steam_link TEXT,
+        platform TEXT DEFAULT 'Steam'
       );`)
     }
 
@@ -192,7 +199,7 @@ function renderGrid() {
   let rows = result[0].values
 
   rows = rows.filter((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
 
     if (
       filters.search &&
@@ -212,7 +219,7 @@ function renderGrid() {
 
   const groupedItems = new Map()
   rows.forEach((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
 
     const groupKey = `${name}|${buyPrice}`
 
@@ -229,6 +236,7 @@ function renderGrid() {
         buyPrice,
         purchaseDate,
         steamLink,
+        platform,
         quantity: 1,
         totalValue: buyPrice,
       })
@@ -266,7 +274,7 @@ function renderGrid() {
   let gridHTML = '<div class="grid-container">'
 
   for (const item of paginatedRows) {
-    const { ids, name, type, buyPrice, purchaseDate, steamLink, quantity, totalValue } = item
+    const { ids, name, type, buyPrice, purchaseDate, steamLink, platform, quantity, totalValue } = item
     const formattedDate = formatDate(purchaseDate)
 
     const nameDisplay = steamLink
@@ -380,7 +388,7 @@ function renderList() {
   let rows = result[0].values
 
   rows = rows.filter((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
 
     if (
       filters.search &&
@@ -400,7 +408,7 @@ function renderList() {
 
   const groupedItems = new Map()
   rows.forEach((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
 
     const groupKey = `${name}|${buyPrice}`
 
@@ -417,6 +425,7 @@ function renderList() {
         buyPrice,
         purchaseDate,
         steamLink,
+        platform,
         quantity: 1,
         totalValue: buyPrice,
       })
@@ -452,7 +461,7 @@ function renderList() {
   }
 
   for (const item of paginatedRows) {
-    const { ids, name, type, buyPrice, purchaseDate, steamLink, quantity, totalValue } = item
+    const { ids, name, type, buyPrice, purchaseDate, steamLink, platform, quantity, totalValue } = item
     const formattedDate = formatDate(purchaseDate)
 
     const tr = document.createElement("tr")
@@ -552,7 +561,7 @@ function confirmSellSelected() {
   idsArray.forEach((id) => {
     const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
     if (result && result[0]) {
-      const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
+      const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform] = result[0].values[0]
       selectedItemsData.push({
         id: skinId,
         name: skinName,
@@ -628,7 +637,7 @@ function sellSelectedItems() {
     const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
     if (!result || !result[0]) return
 
-    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
+    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform] = result[0].values[0]
     const sellPrice = itemPrices[id]
 
     const profit = sellPrice - buyPrice
@@ -646,6 +655,7 @@ function sellSelectedItems() {
       sale_date: new Date().toISOString().split("T")[0],
       profit: profit,
       steam_link: steamLink,
+      platform: platform,
     })
   })
 
@@ -775,7 +785,7 @@ function sellSkin(ids, name) {
     const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
     if (!result || !result[0]) return
 
-    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
+    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform] = result[0].values[0]
 
     history.push({
       id: Date.now() + Math.random(),
@@ -787,6 +797,7 @@ function sellSkin(ids, name) {
       sale_date: new Date().toISOString().split("T")[0],
       profit: sellPrice - buyPrice,
       steam_link: steamLink,
+      platform: platform,
     })
   })
 
@@ -848,7 +859,11 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
-async function fetchSteamData(steamUrl) {
+async function fetchSteamData(steamUrl, platform = "Steam") {
+  if (platform !== "Steam") {
+    throw new Error(`Platform "${platform}" is not yet supported`)
+  }
+
   const match = steamUrl.match(/listings\/(\d+)\/(.+?)(?:\?|$)/)
   if (!match) {
     throw new Error("Invalid Steam Market URL")
@@ -901,9 +916,18 @@ function showAddModal() {
   body.innerHTML = `
     <form id="addForm">
       <div class="form-group">
+        <label>Platform</label>
+        <select id="platformSelect" required class="form-select">
+          <option value="Steam">Steam</option>
+        </select>
+        <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">
+          More platforms coming soon
+        </p>
+      </div>
+      <div class="form-group">
         <label>Steam Market Link</label>
         <input type="url" id="steamLink" placeholder="https://steamcommunity.com/market/listings/..." />
-        <button type="button" class="btn btn-secondary" id="fetchSteamData" style="margin-top: 8px;">Fetch Data from Steam</button>
+        <button type="button" class="btn btn-secondary" id="fetchSteamData" style="margin-top: 8px;">Fetch Data</button>
         <div id="steamFetchStatus" style="margin-top: 8px; font-size: 0.875rem;"></div>
       </div>
       <div class="form-group">
@@ -947,6 +971,7 @@ function showAddModal() {
 
   const nameInput = document.getElementById("skinName")
   const typeSelect = document.getElementById("skinType")
+  const platformSelect = document.getElementById("platformSelect")
 
   nameInput.addEventListener("input", () => {
     const name = nameInput.value.toLowerCase()
@@ -1006,6 +1031,7 @@ function showAddModal() {
     const statusDiv = document.getElementById("steamFetchStatus")
     const nameInput = document.getElementById("skinName")
     const priceInput = document.getElementById("buyPrice")
+    const platform = platformSelect.value
 
     const steamUrl = steamLinkInput.value.trim()
 
@@ -1015,11 +1041,11 @@ function showAddModal() {
       return
     }
 
-    statusDiv.textContent = "🔄 Fetching data from Steam..."
+    statusDiv.textContent = `🔄 Fetching data from ${platform}...`
     statusDiv.style.color = "var(--text-muted)"
 
     try {
-      const data = await fetchSteamData(steamUrl)
+      const data = await fetchSteamData(steamUrl, platform)
 
       nameInput.value = data.name
       priceInput.value = data.price.toFixed(2)
@@ -1050,11 +1076,12 @@ function addSkin() {
   const purchaseDate = document.getElementById("purchaseDate").value
   const steamLink = document.getElementById("steamLink").value.trim() || null
   const quantity = Number.parseInt(document.getElementById("quantity").value) || 1
+  const platform = document.getElementById("platformSelect").value
 
   for (let i = 0; i < quantity; i++) {
     database.run(
-      "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link) VALUES (?, ?, ?, ?, ?, ?)",
-      [name, type, buyPrice, 0, purchaseDate, steamLink],
+      "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link, platform) VALUES (?, ?, ?, ?, ?, ?)",
+      [name, type, buyPrice, 0, purchaseDate, steamLink, platform],
     )
   }
 

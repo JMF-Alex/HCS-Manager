@@ -77,7 +77,7 @@ Once opened, you can:
 ## Roadmap  
 - [ ] Multi-language support (in process)
 - [ ] Multiple export/import options
-- [ ] Add multiple market options, not only Steam
+- [ ] Add multiple market options, not only Steam (in process)
 - [ ] Add multiple inventories/histories profiles
 - [ ] Add steam comissions calculator
 - [ ] Import Steam inventory

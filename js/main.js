@@ -21,7 +21,8 @@ async function initialize() {
       type TEXT,
       buy_price REAL, 
       sell_price REAL,
-      purchase_date TEXT
+      purchase_date TEXT,
+      platform TEXT DEFAULT 'Steam'
     );`)
   }
 
