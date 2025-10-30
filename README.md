@@ -81,10 +81,10 @@ Once opened, you can:
 - [ ] Add multiple inventories/histories profiles
 - [ ] Add steam comissions calculator
 - [ ] Import Steam inventory
-- [ ] Export CSV and PDF analytics
+- [x] Export CSV and PDF analytics
 - [ ] Switch between list and grid view for files
 - [ ] News page
-- [ ] Sell multiple items
+- [x] Sell multiple items
 
 ## Contributing  
 Contributions are welcome!  
