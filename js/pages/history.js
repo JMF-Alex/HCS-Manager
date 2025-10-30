@@ -3,40 +3,6 @@ let itemsPerPage = 10
 let filteredData = []
 const selectedItems = new Set()
 
-function showToast(message, type = "info") {
-  const container = document.getElementById("toastContainer")
-  if (!container) {
-    console.warn("Toast container not found")
-    return
-  }
-
-  const toast = document.createElement("div")
-  toast.className = `toast ${type}`
-
-  const icons = {
-    success: "✓",
-    error: "✕",
-    warning: "⚠",
-    info: "ℹ",
-  }
-
-  const icon = icons[type] || icons.info
-
-  toast.innerHTML = `
-    <span class="toast-icon">${icon}</span>
-    <span class="toast-message">${message}</span>
-  `
-
-  container.appendChild(toast)
-
-  setTimeout(() => {
-    toast.classList.add("hiding")
-    setTimeout(() => toast.remove(), 300)
-  }, 3000)
-}
-
-window.showToast = showToast
-
 initialize()
 
 function initialize() {
@@ -52,9 +18,6 @@ function initialize() {
 
 function setupEventListeners() {
   const clearBtn = document.getElementById("clearHistory")
-  const fileInput = document.getElementById("fileInput")
-  const modalClose = document.getElementById("modalClose")
-  const modal = document.getElementById("modal")
   const searchInput = document.getElementById("searchInput")
   const clearFilters = document.getElementById("clearFilters")
   const itemsPerPageSelect = document.getElementById("itemsPerPage")
@@ -64,11 +27,8 @@ function setupEventListeners() {
   const selectAll = document.getElementById("selectAll")
   const deleteSelected = document.getElementById("deleteSelected")
 
-  const accountBtn = document.getElementById("accountBtn")
 
   if (clearBtn) clearBtn.addEventListener("click", confirmClearHistory)
-  if (fileInput) fileInput.addEventListener("change", importData)
-  if (modalClose) modalClose.addEventListener("click", closeModal)
   if (searchInput)
     searchInput.addEventListener("input", () => {
       currentPage = 1
@@ -78,8 +38,6 @@ function setupEventListeners() {
 
   if (selectAll) selectAll.addEventListener("change", handleSelectAll)
   if (deleteSelected) deleteSelected.addEventListener("click", confirmDeleteSelected)
-
-  if (accountBtn) accountBtn.addEventListener("click", showAccountModal)
 
   if (itemsPerPageSelect)
     itemsPerPageSelect.addEventListener("change", (e) => {
@@ -103,12 +61,6 @@ function setupEventListeners() {
       }
     })
 
-  if (modal) {
-    modal.addEventListener("click", (e) => {
-      if (e.target.id === "modal") closeModal()
-    })
-  }
-
   const filterIds = [
     "filterType",
     "filterMinPrice",
@@ -127,76 +79,6 @@ function setupEventListeners() {
       })
     }
   })
-}
-
-function showAccountModal() {
-  const modal = document.getElementById("modal")
-  const title = document.getElementById("modalTitle")
-  const body = document.getElementById("modalBody")
-
-  const savedLanguage = localStorage.getItem("language") || "en"
-
-  title.textContent = "Account Settings"
-  body.innerHTML = `
-    <form id="accountForm">
-      <div class="form-group">
-        <label>Language</label>
-        <select id="languageSelect" class="form-select">
-          <option value="en" ${savedLanguage === "en" ? "selected" : ""}>English</option>
-          <option value="es" ${savedLanguage === "es" ? "selected" : ""}>Español</option>
-          <option value="fr" ${savedLanguage === "fr" ? "selected" : ""}>Français</option>
-          <option value="de" ${savedLanguage === "de" ? "selected" : ""}>Deutsch</option>
-          <option value="pt" ${savedLanguage === "pt" ? "selected" : ""}>Português</option>
-        </select>
-      </div>
-      
-      <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
-        <label style="margin-bottom: 0.75rem; display: block; font-weight: 600;">Database Management</label>
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="button" class="btn btn-secondary" id="exportDBModal" style="flex: 1;">
-            Export Data
-          </button>
-          <button type="button" class="btn btn-secondary" id="importDBModal" style="flex: 1;">
-            Import Data
-          </button>
-        </div>
-        <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
-          Export your database to backup or import to restore data
-        </p>
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
-      </div>
-    </form>
-  `
-
-  modal.classList.add("active")
-
-  document.getElementById("exportDBModal").addEventListener("click", () => {
-    exportData()
-  })
-
-  document.getElementById("importDBModal").addEventListener("click", () => {
-    const fileInput = document.getElementById("fileInput")
-    if (fileInput) {
-      fileInput.click()
-    }
-  })
-
-  document.getElementById("accountForm").onsubmit = (e) => {
-    e.preventDefault()
-    const language = document.getElementById("languageSelect").value
-    const previousLanguage = localStorage.getItem("language") || "en"
-    localStorage.setItem("language", language)
-    if (language !== previousLanguage) {
-      showToast(`Language changed to ${language.toUpperCase()}`, "success")
-    } else {
-      showToast("Settings saved successfully", "success")
-    }
-    closeModal()
-  }
 }
 
 function clearAllFilters() {
@@ -640,8 +522,4 @@ function clearHistory() {
   renderTable()
   closeModal()
   showToast("History cleared successfully", "success")
-}
-
-function closeModal() {
-  document.getElementById("modal").classList.remove("active")
 }

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/components/stats.css">
   <link rel="stylesheet" href="css/components/charts.css">
+  <link rel="stylesheet" href="css/components/forms.css">
   <link rel="stylesheet" href="css/pages/analytics.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -38,6 +39,8 @@
       <button id="refreshData" class="btn btn-primary">Refresh Data</button>
     </div>
   </nav>
+
+  <input type="file" id="fileInput" style="display:none" accept=".json" />
 
   <main class="container" style="display: block;">
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem;">

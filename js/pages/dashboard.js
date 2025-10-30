@@ -1,6 +1,3 @@
-let database
-let sqlModule
-
 initialize()
 
 async function initialize() {
@@ -58,66 +55,4 @@ function loadAnalytics() {
   document.getElementById("totalValue").textContent = `€${totalInventoryValue.toFixed(2)}`
   document.getElementById("itemsSold").textContent = itemsSold
   document.getElementById("totalProfit").textContent = `€${totalProfit.toFixed(2)}`
-}
-
-function showToast(message, type = "info") {
-  const container = document.getElementById("toastContainer")
-  if (!container) {
-    console.warn("Toast container not found")
-    return
-  }
-
-  const toast = document.createElement("div")
-  toast.className = `toast ${type}`
-
-  const icons = {
-    success: "✓",
-    error: "✕",
-    warning: "⚠",
-    info: "ℹ",
-  }
-
-  const icon = icons[type] || icons.info
-
-  toast.innerHTML = `
-    <span class="toast-icon">${icon}</span>
-    <span class="toast-message">${message}</span>
-  `
-
-  container.appendChild(toast)
-
-  setTimeout(() => {
-    toast.classList.add("hiding")
-    setTimeout(() => toast.remove(), 300)
-  }, 3000)
-}
-
-window.showToast = showToast
-
-function exportDatabase() {
-  try {
-    const savedData = localStorage.getItem("skinsDB")
-    const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
-
-    if (!savedData) {
-      showToast("No database found to export", "error")
-      return
-    }
-
-    const fullExport = {
-      database: JSON.parse(savedData),
-      history: history,
-      exportDate: new Date().toISOString(),
-      version: "1.0",
-    }
-
-    const blob = new Blob([JSON.stringify(fullExport, null, 2)], { type: "application/json" })
-    const link = document.createElement("a")
-    link.href = URL.createObjectURL(blob)
-    link.download = `hcs-manager-full-${new Date().toISOString().split("T")[0]}.json`
-    link.click()
-  } catch (error) {
-    console.error("Export error:", error)
-    showToast("Failed to export database", "error")
-  }
 }

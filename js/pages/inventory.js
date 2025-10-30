@@ -1,44 +1,9 @@
-let database
-let sqlModule
 let currentPage = 1
 let itemsPerPage = 10
 let filteredData = []
 const selectedItems = new Set()
 const PROXY = "https://corsproxy.io/?"
 
-function showToast(message, type = "info") {
-  const container = document.getElementById("toastContainer")
-  if (!container) {
-    console.warn("Toast container not found")
-    return
-  }
-
-  const toast = document.createElement("div")
-  toast.className = `toast ${type}`
-
-  const icons = {
-    success: "✓",
-    error: "✕",
-    warning: "⚠",
-    info: "ℹ",
-  }
-
-  const icon = icons[type] || icons.info
-
-  toast.innerHTML = `
-    <span class="toast-icon">${icon}</span>
-    <span class="toast-message">${message}</span>
-  `
-
-  container.appendChild(toast)
-
-  setTimeout(() => {
-    toast.classList.add("hiding")
-    setTimeout(() => toast.remove(), 300)
-  }, 3000)
-}
-
-window.showToast = showToast
 
 initialize()
 
@@ -94,24 +59,19 @@ async function initialize() {
 
 function setupEventListeners() {
   const addSkinBtn = document.getElementById("addSkin")
-  const fileInput = document.getElementById("fileInput")
-  const modalClose = document.getElementById("modalClose")
-  const modal = document.getElementById("modal")
   const searchInput = document.getElementById("searchInput")
   const clearFilters = document.getElementById("clearFilters")
 
   const selectAll = document.getElementById("selectAll")
   const deleteSelected = document.getElementById("deleteSelected")
+  const sellSelected = document.getElementById("sellSelected")
 
   const itemsPerPageSelect = document.getElementById("itemsPerPage")
   const prevPageBtn = document.getElementById("prevPage")
   const nextPageBtn = document.getElementById("nextPage")
 
-  const accountBtn = document.getElementById("accountBtn")
 
   if (addSkinBtn) addSkinBtn.addEventListener("click", showAddModal)
-  if (fileInput) fileInput.addEventListener("change", importDatabase)
-  if (modalClose) modalClose.addEventListener("click", closeModal)
   if (searchInput)
     searchInput.addEventListener("input", () => {
       currentPage = 1
@@ -121,8 +81,7 @@ function setupEventListeners() {
 
   if (selectAll) selectAll.addEventListener("change", handleSelectAll)
   if (deleteSelected) deleteSelected.addEventListener("click", confirmDeleteSelected)
-
-  if (accountBtn) accountBtn.addEventListener("click", showAccountModal)
+  if (sellSelected) sellSelected.addEventListener("click", confirmSellSelected)
 
   if (itemsPerPageSelect) {
     itemsPerPageSelect.addEventListener("change", (e) => {
@@ -148,12 +107,6 @@ function setupEventListeners() {
         currentPage++
         renderTable()
       }
-    })
-  }
-
-  if (modal) {
-    modal.addEventListener("click", (e) => {
-      if (e.target.id === "modal") closeModal()
     })
   }
 
@@ -185,76 +138,6 @@ function clearAllFilters() {
   })
   currentPage = 1
   renderTable()
-}
-
-function showAccountModal() {
-  const modal = document.getElementById("modal")
-  const title = document.getElementById("modalTitle")
-  const body = document.getElementById("modalBody")
-
-  const savedLanguage = localStorage.getItem("language") || "en"
-
-  title.textContent = "Account Settings"
-  body.innerHTML = `
-    <form id="accountForm">
-      <div class="form-group">
-        <label>Language</label>
-        <select id="languageSelect" class="form-select">
-          <option value="en" ${savedLanguage === "en" ? "selected" : ""}>English</option>
-          <option value="es" ${savedLanguage === "es" ? "selected" : ""}>Español</option>
-          <option value="fr" ${savedLanguage === "fr" ? "selected" : ""}>Français</option>
-          <option value="de" ${savedLanguage === "de" ? "selected" : ""}>Deutsch</option>
-          <option value="pt" ${savedLanguage === "pt" ? "selected" : ""}>Português</option>
-        </select>
-      </div>
-      
-      <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
-        <label style="margin-bottom: 0.75rem; display: block; font-weight: 600;">Database Management</label>
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="button" class="btn btn-secondary" id="exportDBModal" style="flex: 1;">
-            Export Data
-          </button>
-          <button type="button" class="btn btn-secondary" id="importDBModal" style="flex: 1;">
-            Import Data
-          </button>
-        </div>
-        <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
-          Export your database to backup or import to restore data
-        </p>
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
-      </div>
-    </form>
-  `
-
-  modal.classList.add("active")
-
-  document.getElementById("exportDBModal").addEventListener("click", () => {
-    exportDatabase()
-  })
-
-  document.getElementById("importDBModal").addEventListener("click", () => {
-    const fileInput = document.getElementById("fileInput")
-    if (fileInput) {
-      fileInput.click()
-    }
-  })
-
-  document.getElementById("accountForm").onsubmit = (e) => {
-    e.preventDefault()
-    const language = document.getElementById("languageSelect").value
-    const previousLanguage = localStorage.getItem("language") || "en"
-    localStorage.setItem("language", language)
-    if (language !== previousLanguage) {
-      showToast(`Language changed to ${language.toUpperCase()}`, "success")
-    } else {
-      showToast("Settings saved successfully", "success")
-    }
-    closeModal()
-  }
 }
 
 function saveDatabase() {
@@ -457,6 +340,132 @@ function updateBulkActionsBar() {
   } else {
     bulkActionsBar.style.display = "none"
   }
+}
+
+function confirmSellSelected() {
+  if (selectedItems.size === 0) return
+
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  const selectedItemsData = []
+  const idsArray = Array.from(selectedItems)
+
+  idsArray.forEach((id) => {
+    const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
+    if (result && result[0]) {
+      const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
+      selectedItemsData.push({
+        id: skinId,
+        name: skinName,
+        type: type,
+        buyPrice: buyPrice,
+      })
+    }
+  })
+
+  title.textContent = "Sell Selected Items"
+  body.innerHTML = `
+    <p class="confirm-text">Set the sell price for each item:</p>
+    <div style="max-height: 400px; overflow-y: auto; margin: 1rem 0;">
+      ${selectedItemsData
+        .map(
+          (item, index) => `
+        <div class="form-group" style="padding: 0.75rem; background: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <strong style="color: var(--text-primary);">${escapeHtml(item.name)}</strong>
+            <span style="color: var(--text-muted); font-size: 0.875rem;">Buy: €${item.buyPrice.toFixed(2)}</span>
+          </div>
+          <label style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Sell Price (€)</label>
+          <input type="number" id="sellPrice_${item.id}" class="sell-price-input" step="0.01" required placeholder="0.00" data-item-id="${item.id}" data-buy-price="${item.buyPrice}" style="width: 100%;" />
+        </div>
+      `,
+        )
+        .join("")}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="sellSelectedItems()">Sell All</button>
+    </div>
+  `
+
+  modal.classList.add("active")
+}
+
+function sellSelectedItems() {
+  const idsToSell = Array.from(selectedItems)
+  if (idsToSell.length === 0) {
+    showToast("No items selected", "warning")
+    return
+  }
+
+  const itemPrices = {}
+  let hasInvalidPrice = false
+
+  idsToSell.forEach((id) => {
+    const priceInput = document.getElementById(`sellPrice_${id}`)
+    if (priceInput) {
+      const sellPrice = Number.parseFloat(priceInput.value)
+      if (isNaN(sellPrice) || sellPrice <= 0) {
+        hasInvalidPrice = true
+        priceInput.style.borderColor = "var(--accent-danger)"
+      } else {
+        itemPrices[id] = sellPrice
+        priceInput.style.borderColor = ""
+      }
+    }
+  })
+
+  if (hasInvalidPrice) {
+    showToast("Please enter valid prices for all items", "error")
+    return
+  }
+
+  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
+  let totalProfit = 0
+  let totalSold = 0
+  let exampleName = ""
+
+  idsToSell.forEach((id) => {
+    const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
+    if (!result || !result[0]) return
+
+    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink] = result[0].values[0]
+    const sellPrice = itemPrices[id]
+
+    const profit = sellPrice - buyPrice
+    totalProfit += profit
+    totalSold++
+    if (!exampleName) exampleName = skinName
+
+    history.push({
+      id: Date.now() + Math.random(),
+      name: skinName,
+      type: type,
+      buy_price: buyPrice,
+      sell_price: sellPrice,
+      purchase_date: purchaseDate,
+      sale_date: new Date().toISOString().split("T")[0],
+      profit: profit,
+      steam_link: steamLink,
+    })
+  })
+
+  localStorage.setItem("skinsHistory", JSON.stringify(history))
+
+  const placeholders = idsToSell.map(() => "?").join(",")
+  database.run(`DELETE FROM skins WHERE id IN (${placeholders})`, idsToSell)
+
+  saveDatabase()
+  selectedItems.clear()
+  renderTable()
+  closeModal()
+
+  const profitText = totalProfit >= 0 ? `+€${totalProfit.toFixed(2)}` : `-€${Math.abs(totalProfit).toFixed(2)}`
+  const quantityText = totalSold > 1 ? ` (${totalSold} items)` : ""
+
+  showToast(`${exampleName}${quantityText} sold (${profitText} total)`, totalProfit >= 0 ? "success" : "warning")
 }
 
 function confirmDeleteSelected() {
@@ -856,82 +865,6 @@ function addSkin() {
   renderTable()
   closeModal()
   showToast(`${quantity} ${name} added to inventory`, "success")
-}
-
-function exportDatabase() {
-  const exportedData = database.export()
-  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
-
-  const fullExport = {
-    database: Array.from(exportedData),
-    history: history,
-    exportDate: new Date().toISOString(),
-    version: "1.0",
-  }
-
-  const blob = new Blob([JSON.stringify(fullExport, null, 2)], { type: "application/json" })
-  const link = document.createElement("a")
-  link.href = URL.createObjectURL(blob)
-  link.download = `hcs-manager-full-${new Date().toISOString().split("T")[0]}.json`
-  link.click()
-  showToast("Database exported successfully", "success")
-}
-
-function importDatabase(event) {
-  const file = event.target.files[0]
-  if (!file) return
-
-  const reader = new FileReader()
-  reader.onload = () => {
-    try {
-      const content = reader.result
-
-      try {
-        const jsonData = JSON.parse(content)
-
-        if (jsonData.database && Array.isArray(jsonData.database)) {
-          const dataArray = new Uint8Array(jsonData.database)
-          database = new sqlModule.Database(dataArray)
-          saveDatabase()
-
-          if (jsonData.history && Array.isArray(jsonData.history)) {
-            localStorage.setItem("skinsHistory", JSON.stringify(jsonData.history))
-          }
-
-          renderTable()
-          showToast("Data imported successfully!", "success")
-        } else {
-          throw new Error("Invalid JSON format")
-        }
-      } catch (jsonError) {
-        const dataArray = new Uint8Array(content)
-        database = new sqlModule.Database(dataArray)
-        saveDatabase()
-        renderTable()
-        showToast("Database imported successfully!", "success")
-      }
-    } catch (error) {
-      console.error("Import error:", error)
-      showToast("Failed to import file. Please check the file format.", "error")
-    }
-  }
-
-  if (file.name.endsWith(".json")) {
-    reader.readAsText(file)
-  } else {
-    reader.readAsArrayBuffer(file)
-  }
-
-  event.target.value = ""
-}
-
-function closeModal() {
-  const modal = document.getElementById("modal")
-  modal.classList.remove("active")
-  const modalContent = modal.querySelector(".modal-content")
-  if (modalContent) {
-    modalContent.classList.remove("wide")
-  }
 }
 
 async function showInfoModal(id, steamLink, savedName, purchaseDate) {

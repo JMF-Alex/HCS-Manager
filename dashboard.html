@@ -6,10 +6,10 @@
   <meta name="description" content="HCS-Manager - Dashboard">
   <link rel="icon" type="image/jpeg" href="assets/img/logo.webp">
   <title>HCS-Manager - Dashboard</title>
-  <!-- Import base styles, stats component, and page-specific CSS -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/components/stats.css">
   <link rel="stylesheet" href="css/pages/dashboard.css">
+  <link rel="stylesheet" href="css/components/forms.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
 </head>
 <body>
@@ -36,6 +36,8 @@
       <button id="accountBtn" class="btn btn-secondary">Account</button>
     </div>
   </nav>
+
+  <input type="file" id="fileInput" style="display:none" accept=".json" />
 
   <main class="dashboard-container">
     <header class="dashboard-header">
