@@ -2,6 +2,26 @@ let currentPage = 1
 let itemsPerPage = 10
 let filteredData = []
 const selectedItems = new Set()
+let viewMode = localStorage.getItem("viewMode") || "list"
+
+function closeModal() {
+  const modal = document.getElementById("modal")
+  if (modal) modal.classList.remove("active")
+}
+
+function showToast(message, type) {
+  const toastContainer = document.getElementById("toastContainer")
+  if (!toastContainer) return
+
+  const toast = document.createElement("div")
+  toast.className = `toast ${type}`
+  toast.textContent = message
+  toastContainer.appendChild(toast)
+
+  setTimeout(() => {
+    toastContainer.removeChild(toast)
+  }, 3000)
+}
 
 initialize()
 
@@ -12,6 +32,11 @@ function initialize() {
   if (itemsPerPageSelect) {
     itemsPerPageSelect.value = itemsPerPage.toString()
   }
+
+  window.addEventListener("viewModeChanged", (e) => {
+    viewMode = e.detail.viewMode
+    renderTable()
+  })
 
   renderTable()
 }
@@ -26,7 +51,6 @@ function setupEventListeners() {
 
   const selectAll = document.getElementById("selectAll")
   const deleteSelected = document.getElementById("deleteSelected")
-
 
   if (clearBtn) clearBtn.addEventListener("click", confirmClearHistory)
   if (searchInput)
@@ -181,10 +205,204 @@ function deleteSelectedItems() {
 }
 
 function renderTable() {
+  if (viewMode === "grid") {
+    renderGrid()
+  } else {
+    renderList()
+  }
+}
+
+function renderGrid() {
+  const container = document.querySelector(".table-container")
+  const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
+
+  selectedItems.clear()
+  updateBulkActionsBar()
+
+  const filters = {
+    search: document.getElementById("searchInput")?.value.toLowerCase() || "",
+    type: document.getElementById("filterType")?.value || "",
+    minPrice: document.getElementById("filterMinPrice")?.value || "",
+    maxPrice: document.getElementById("filterMaxPrice")?.value || "",
+    startDate: document.getElementById("filterStartDate")?.value || "",
+    endDate: document.getElementById("filterEndDate")?.value || "",
+    profit: document.getElementById("filterProfit")?.value || "",
+  }
+
+  filteredData = history.filter((item) => {
+    if (
+      filters.search &&
+      !item.name.toLowerCase().includes(filters.search) &&
+      !item.type.toLowerCase().includes(filters.search)
+    ) {
+      return false
+    }
+    if (filters.type && item.type !== filters.type) return false
+    if (filters.minPrice && item.buy_price < Number.parseFloat(filters.minPrice)) return false
+    if (filters.maxPrice && item.buy_price > Number.parseFloat(filters.maxPrice)) return false
+    if (filters.startDate && item.sale_date && item.sale_date < filters.startDate) return false
+    if (filters.endDate && item.sale_date && item.sale_date > filters.endDate) return false
+    if (filters.profit) {
+      const profit = item.sell_price - item.buy_price
+      if (filters.profit === "positive" && profit < 0) return false
+      if (filters.profit === "negative" && profit >= 0) return false
+    }
+
+    return true
+  })
+
+  filteredData = filteredData.reverse()
+
+  const groupedItems = new Map()
+  filteredData.forEach((item) => {
+    const groupKey = `${item.name}|${item.buy_price}|${item.sell_price}`
+
+    if (groupedItems.has(groupKey)) {
+      const existing = groupedItems.get(groupKey)
+      existing.quantity += 1
+      existing.ids.push(item.id)
+      existing.totalBuyPrice += item.buy_price
+      existing.totalSellPrice += item.sell_price
+      existing.totalProfit += item.sell_price - item.buy_price
+      if (item.sale_date > existing.sale_date) {
+        existing.sale_date = item.sale_date
+      }
+    } else {
+      groupedItems.set(groupKey, {
+        ids: [item.id],
+        name: item.name,
+        type: item.type,
+        buy_price: item.buy_price,
+        sell_price: item.sell_price,
+        totalBuyPrice: item.buy_price,
+        totalSellPrice: item.sell_price,
+        totalProfit: item.sell_price - item.buy_price,
+        purchase_date: item.purchase_date,
+        sale_date: item.sale_date,
+        steam_link: item.steam_link,
+        quantity: 1,
+      })
+    }
+  })
+
+  const groupedData = Array.from(groupedItems.values())
+  filteredData = groupedData
+
+  if (groupedData.length === 0) {
+    const hasFilters = Object.values(filters).some((v) => v !== "")
+    const message = hasFilters
+      ? '<div class="grid-empty-state-icon">🔍</div><div class="grid-empty-state-text">No Results Found</div><div class="grid-empty-state-subtext">Try adjusting your filters</div>'
+      : '<div class="grid-empty-state-icon">📊</div><div class="grid-empty-state-text">No Sales History</div><div class="grid-empty-state-subtext">Sold items will appear here</div>'
+
+    container.innerHTML = `<div class="grid-container"><div class="grid-empty-state">${message}</div></div>`
+    updatePaginationInfo(0, 0, 0)
+    updatePaginationButtons()
+    return
+  }
+
+  const totalItems = groupedData.length
+  let paginatedItems = groupedData
+  let startIndex = 0
+  let endIndex = totalItems
+
+  if (itemsPerPage !== "all") {
+    startIndex = (currentPage - 1) * itemsPerPage
+    endIndex = Math.min(startIndex + itemsPerPage, totalItems)
+    paginatedItems = groupedData.slice(startIndex, endIndex)
+  }
+
+  let gridHTML = '<div class="grid-container">'
+
+  paginatedItems.forEach((item) => {
+    const { ids, name, type, buy_price, sell_price, totalProfit, purchase_date, sale_date, steam_link, quantity } = item
+
+    const profit = sell_price - buy_price
+    const percentage = ((profit / buy_price) * 100).toFixed(2)
+    const profitClass = profit >= 0 ? "profit-positive" : "profit-negative"
+
+    const purchaseDate = formatDate(purchase_date)
+    const saleDate = formatDate(sale_date)
+
+    const nameDisplay = steam_link
+      ? `<a href="${escapeHtml(steam_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`
+      : escapeHtml(name)
+
+    gridHTML += `
+      <div class="grid-item">
+        <input type="checkbox" class="checkbox-input grid-item-checkbox item-checkbox" data-ids='${JSON.stringify(ids)}' />
+        ${quantity > 1 ? `<div class="grid-item-quantity">${quantity}x</div>` : ""}
+        <div class="grid-item-header">
+          <div class="grid-item-name">${nameDisplay}</div>
+          <span class="grid-item-type">${escapeHtml(type)}</span>
+        </div>
+        <div class="grid-item-details">
+          <div class="grid-item-detail">
+            <span class="grid-item-detail-label">Buy Price:</span>
+            <span class="grid-item-detail-value">€${buy_price.toFixed(2)}</span>
+          </div>
+          <div class="grid-item-detail">
+            <span class="grid-item-detail-label">Sell Price:</span>
+            <span class="grid-item-detail-value">€${sell_price.toFixed(2)}</span>
+          </div>
+        </div>
+        <div class="grid-item-profit">
+          <div class="grid-item-profit-label">Profit</div>
+          <div class="grid-item-profit-value ${profitClass}">€${profit.toFixed(2)} (${percentage}%)</div>
+        </div>
+        <div class="grid-item-actions">
+          <button class="action-btn restore" onclick='restoreItem(${JSON.stringify(ids)}, ${quantity})'>Restore</button>
+          <button class="action-btn delete" onclick='confirmDeleteItem(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Delete</button>
+        </div>
+        <div class="grid-item-date">
+          Purchased: ${purchaseDate} • Sold: ${saleDate}
+        </div>
+      </div>
+    `
+  })
+
+  gridHTML += "</div>"
+  container.innerHTML = gridHTML
+
+  document.querySelectorAll(".item-checkbox").forEach((checkbox) => {
+    checkbox.addEventListener("change", handleItemCheckbox)
+  })
+
+  updatePaginationInfo(startIndex + 1, endIndex, totalItems)
+  updatePaginationButtons()
+}
+
+function renderList() {
   const tbody = document.querySelector("#historyTable tbody")
   const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
 
-  tbody.innerHTML = ""
+  const container = document.querySelector(".table-container")
+  if (!container.querySelector("table")) {
+    container.innerHTML = `
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th style="width: 50px;">
+              <input type="checkbox" id="selectAll" aria-label="Select all items">
+            </th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Buy Price</th>
+            <th>Sell Price</th>
+            <th>Profit</th>
+            <th>Percentage</th>
+            <th>Quantity</th>
+            <th>Purchase Date</th>
+            <th>Sale Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    `
+  }
+
+  const tbodyElement = document.querySelector("#historyTable tbody")
+  tbodyElement.innerHTML = ""
   selectedItems.clear()
   updateBulkActionsBar()
 
@@ -266,7 +484,7 @@ function renderTable() {
       ? '<div class="empty-state-icon">🔍</div><div class="empty-state-text">No Results Found</div><div class="empty-state-subtext">Try adjusting your filters</div>'
       : '<div class="empty-state-icon">📊</div><div class="empty-state-text">No Sales History</div><div class="empty-state-subtext">Sold items will appear here</div>'
 
-    tbody.innerHTML = `
+    tbodyElement.innerHTML = `
       <tr>
         <td colspan="11" class="empty-state">${message}</td>
       </tr>`
@@ -321,7 +539,7 @@ function renderTable() {
         </div>
       </td>
     `
-    tbody.appendChild(tr)
+    tbodyElement.appendChild(tr)
   })
 
   document.querySelectorAll(".item-checkbox").forEach((checkbox) => {

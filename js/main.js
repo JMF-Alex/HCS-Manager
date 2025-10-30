@@ -636,6 +636,7 @@ function showAccountModal() {
   const title = document.getElementById("modalTitle")
   const body = document.getElementById("modalBody")
   const savedLanguage = localStorage.getItem("language") || "en"
+  const savedView = localStorage.getItem("viewMode") || "list"
 
   title.textContent = "Account Settings"
   body.innerHTML = `
@@ -681,6 +682,21 @@ function showAccountModal() {
         </p>
       </div>
 
+      <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem;">
+        <label style="margin-bottom: 0.75rem; display: block; font-weight: 600;">View Mode</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn ${savedView === "list" ? "btn-primary" : "btn-secondary"}" id="viewModeList" style="flex: 1; height: 80px; border-radius: 12px;">
+            List View
+          </button>
+          <button type="button" class="btn ${savedView === "grid" ? "btn-primary" : "btn-secondary"}" id="viewModeGrid" style="flex: 1; height: 80px; border-radius: 12px;">
+            Grid View
+          </button>
+        </div>
+        <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+          Choose how to display inventory and history items
+        </p>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -689,6 +705,23 @@ function showAccountModal() {
   `
 
   modal.classList.add("active")
+  modal.removeAttribute("aria-hidden")
+
+  let selectedView = savedView
+  const listBtn = document.getElementById("viewModeList")
+  const gridBtn = document.getElementById("viewModeGrid")
+
+  listBtn.addEventListener("click", () => {
+    selectedView = "list"
+    listBtn.className = "btn btn-primary"
+    gridBtn.className = "btn btn-secondary"
+  })
+
+  gridBtn.addEventListener("click", () => {
+    selectedView = "grid"
+    listBtn.className = "btn btn-secondary"
+    gridBtn.className = "btn btn-primary"
+  })
 
   document.getElementById("exportDBModal").addEventListener("click", () => {
     exportDatabase()
@@ -715,8 +748,15 @@ function showAccountModal() {
     e.preventDefault()
     const language = document.getElementById("languageSelect").value
     const previousLanguage = localStorage.getItem("language") || "en"
+    const previousView = localStorage.getItem("viewMode") || "list"
+
     localStorage.setItem("language", language)
-    if (language !== previousLanguage) {
+    localStorage.setItem("viewMode", selectedView)
+
+    if (selectedView !== previousView) {
+      window.dispatchEvent(new CustomEvent("viewModeChanged", { detail: { viewMode: selectedView } }))
+      showToast(`View mode changed to ${selectedView}`, "success")
+    } else if (language !== previousLanguage) {
       showToast(`Language changed to ${language.toUpperCase()}`, "success")
     } else {
       showToast("Settings saved successfully", "success")
@@ -726,7 +766,18 @@ function showAccountModal() {
 }
 
 function closeModal() {
-  document.getElementById("modal").classList.remove("active")
+  const modal = document.getElementById("modal")
+
+  const activeElement = document.activeElement
+  if (modal.contains(activeElement)) {
+    activeElement.blur()
+  }
+
+  modal.classList.remove("active")
+
+  setTimeout(() => {
+    modal.setAttribute("aria-hidden", "true")
+  }, 0)
 }
 
 const themeToggleBtn = document.getElementById("themeToggle")

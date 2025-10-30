@@ -3,7 +3,7 @@ let itemsPerPage = 10
 let filteredData = []
 const selectedItems = new Set()
 const PROXY = "https://corsproxy.io/?"
-
+let viewMode = localStorage.getItem("viewMode") || "list"
 
 initialize()
 
@@ -50,6 +50,11 @@ async function initialize() {
       itemsPerPageSelect.value = itemsPerPage.toString()
     }
 
+    window.addEventListener("viewModeChanged", (e) => {
+      viewMode = e.detail.viewMode
+      renderTable()
+    })
+
     renderTable()
   } catch (error) {
     console.error("Initialization error:", error)
@@ -69,7 +74,6 @@ function setupEventListeners() {
   const itemsPerPageSelect = document.getElementById("itemsPerPage")
   const prevPageBtn = document.getElementById("prevPage")
   const nextPageBtn = document.getElementById("nextPage")
-
 
   if (addSkinBtn) addSkinBtn.addEventListener("click", showAddModal)
   if (searchInput)
@@ -147,8 +151,201 @@ function saveDatabase() {
 }
 
 function renderTable() {
+  if (viewMode === "grid") {
+    renderGrid()
+  } else {
+    renderList()
+  }
+}
+
+function renderGrid() {
+  const container = document.querySelector(".table-container")
+
+  selectedItems.clear()
+  updateBulkActionsBar()
+
+  const filters = {
+    search: document.getElementById("searchInput")?.value.toLowerCase() || "",
+    type: document.getElementById("filterType")?.value || "",
+    minPrice: document.getElementById("filterMinPrice")?.value || "",
+    maxPrice: document.getElementById("filterMaxPrice")?.value || "",
+    startDate: document.getElementById("filterStartDate")?.value || "",
+    endDate: document.getElementById("filterEndDate")?.value || "",
+  }
+
+  const result = database.exec("SELECT * FROM skins")
+
+  if (!result || !result[0]) {
+    container.innerHTML = `
+      <div class="grid-container">
+        <div class="grid-empty-state">
+          <div class="grid-empty-state-icon">📦</div>
+          <div class="grid-empty-state-text">No Skins in Inventory</div>
+          <div class="grid-empty-state-subtext">Add your first skin to get started</div>
+        </div>
+      </div>`
+    updatePaginationInfo(0, 0, 0)
+    updatePaginationButtons()
+    return
+  }
+
+  let rows = result[0].values
+
+  rows = rows.filter((row) => {
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+
+    if (
+      filters.search &&
+      !name.toLowerCase().includes(filters.search) &&
+      !type.toLowerCase().includes(filters.search)
+    ) {
+      return false
+    }
+    if (filters.type && type !== filters.type) return false
+    if (filters.minPrice && buyPrice < Number.parseFloat(filters.minPrice)) return false
+    if (filters.maxPrice && buyPrice > Number.parseFloat(filters.maxPrice)) return false
+    if (filters.startDate && purchaseDate && purchaseDate < filters.startDate) return false
+    if (filters.endDate && purchaseDate && purchaseDate > filters.endDate) return false
+
+    return true
+  })
+
+  const groupedItems = new Map()
+  rows.forEach((row) => {
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink] = row
+
+    const groupKey = `${name}|${buyPrice}`
+
+    if (groupedItems.has(groupKey)) {
+      const existing = groupedItems.get(groupKey)
+      existing.quantity += 1
+      existing.ids.push(id)
+      existing.totalValue += buyPrice
+    } else {
+      groupedItems.set(groupKey, {
+        ids: [id],
+        name,
+        type,
+        buyPrice,
+        purchaseDate,
+        steamLink,
+        quantity: 1,
+        totalValue: buyPrice,
+      })
+    }
+  })
+
+  const groupedRows = Array.from(groupedItems.values())
+  filteredData = groupedRows
+
+  if (groupedRows.length === 0) {
+    container.innerHTML = `
+      <div class="grid-container">
+        <div class="grid-empty-state">
+          <div class="grid-empty-state-icon">🔍</div>
+          <div class="grid-empty-state-text">No Results Found</div>
+          <div class="grid-empty-state-subtext">Try adjusting your filters</div>
+        </div>
+      </div>`
+    updatePaginationInfo(0, 0, 0)
+    updatePaginationButtons()
+    return
+  }
+
+  const totalItems = groupedRows.length
+  let paginatedRows = groupedRows
+  let startIndex = 0
+  let endIndex = totalItems
+
+  if (itemsPerPage !== "all") {
+    startIndex = (currentPage - 1) * itemsPerPage
+    endIndex = Math.min(startIndex + itemsPerPage, totalItems)
+    paginatedRows = groupedRows.slice(startIndex, endIndex)
+  }
+
+  let gridHTML = '<div class="grid-container">'
+
+  for (const item of paginatedRows) {
+    const { ids, name, type, buyPrice, purchaseDate, steamLink, quantity, totalValue } = item
+    const formattedDate = formatDate(purchaseDate)
+
+    const nameDisplay = steamLink
+      ? `<a href="${escapeHtml(steamLink)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`
+      : escapeHtml(name)
+
+    const infoButton = steamLink
+      ? `<button class="action-btn info" onclick="showInfoModal(${ids[0]}, '${escapeHtml(steamLink).replace(/'/g, "\\'")}', '${escapeHtml(name).replace(/'/g, "\\'")}', '${purchaseDate}')">Info</button>`
+      : ""
+
+    gridHTML += `
+      <div class="grid-item">
+        <input type="checkbox" class="checkbox-input grid-item-checkbox item-checkbox" data-ids='${JSON.stringify(ids)}' />
+        ${quantity > 1 ? `<div class="grid-item-quantity">${quantity}x</div>` : ""}
+        <div class="grid-item-header">
+          <div class="grid-item-name">${nameDisplay}</div>
+          <span class="grid-item-type">${escapeHtml(type)}</span>
+        </div>
+        <div class="grid-item-details">
+          <div class="grid-item-detail">
+            <span class="grid-item-detail-label">Buy Price:</span>
+            <span class="grid-item-detail-value">€${buyPrice.toFixed(2)}</span>
+          </div>
+          <div class="grid-item-detail">
+            <span class="grid-item-detail-label">Total Value:</span>
+            <span class="grid-item-detail-value">€${totalValue.toFixed(2)}</span>
+          </div>
+        </div>
+        <div class="grid-item-actions">
+          ${infoButton}
+          <button class="action-btn sell" onclick='showSellModal(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Sell</button>
+          <button class="action-btn delete" style="background-color: #dc2626; color: white;" onclick='confirmDeleteItem(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Delete</button>
+        </div>
+        <div class="grid-item-date">
+          Purchased: ${formattedDate}
+        </div>
+      </div>
+    `
+  }
+
+  gridHTML += "</div>"
+  container.innerHTML = gridHTML
+
+  document.querySelectorAll(".item-checkbox").forEach((checkbox) => {
+    checkbox.addEventListener("change", handleItemCheckbox)
+  })
+
+  updatePaginationInfo(startIndex + 1, endIndex, totalItems)
+  updatePaginationButtons()
+}
+
+function renderList() {
   const tbody = document.querySelector("#skinsTable tbody")
-  tbody.innerHTML = ""
+
+  const container = document.querySelector(".table-container")
+  if (!container.querySelector("table")) {
+    container.innerHTML = `
+      <table id="skinsTable">
+        <thead>
+          <tr>
+            <th style="width: 50px;">
+              <input type="checkbox" id="selectAll" aria-label="Select all items">
+            </th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Buy Price</th>
+            <th>Quantity</th>
+            <th>Total Price</th>
+            <th>Purchase Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    `
+  }
+
+  const tbodyElement = document.querySelector("#skinsTable tbody")
+  tbodyElement.innerHTML = ""
   selectedItems.clear()
   updateBulkActionsBar()
 
@@ -167,7 +364,7 @@ function renderTable() {
   const result = database.exec("SELECT * FROM skins")
 
   if (!result || !result[0]) {
-    tbody.innerHTML = `
+    tbodyElement.innerHTML = `
       <tr>
         <td colspan="8" class="empty-state">
           <div class="empty-state-icon">📦</div>
@@ -230,7 +427,7 @@ function renderTable() {
   filteredData = groupedRows
 
   if (groupedRows.length === 0) {
-    tbody.innerHTML = `
+    tbodyElement.innerHTML = `
       <tr>
         <td colspan="8" class="empty-state">
           <div class="empty-state-icon">🔍</div>
@@ -283,7 +480,7 @@ function renderTable() {
         <button class="action-btn delete" style="background-color: #dc2626; color: white;" onclick='confirmDeleteItem(${JSON.stringify(ids)}, "${escapeHtml(name).replace(/'/g, "\\'")}", ${quantity})'>Delete</button>
       </td>
     `
-    tbody.appendChild(tr)
+    tbodyElement.appendChild(tr)
   }
 
   document.querySelectorAll(".item-checkbox").forEach((checkbox) => {
