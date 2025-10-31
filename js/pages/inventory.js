@@ -36,6 +36,12 @@ async function initialize() {
       } catch (e) {
         database.run("ALTER TABLE skins ADD COLUMN purchase_date TEXT")
       }
+
+      try {
+        database.exec("SELECT profile_id FROM skins LIMIT 1")
+      } catch (e) {
+        database.run("ALTER TABLE skins ADD COLUMN profile_id TEXT DEFAULT 'default'")
+      }
     } else {
       database = new sqlModule.Database()
       database.run(`CREATE TABLE IF NOT EXISTS skins (
@@ -46,8 +52,22 @@ async function initialize() {
         sell_price REAL,
         purchase_date TEXT,
         steam_link TEXT,
-        platform TEXT DEFAULT 'Steam'
+        platform TEXT DEFAULT 'Steam',
+        profile_id TEXT DEFAULT 'default'
       );`)
+    }
+
+    const savedProfiles = localStorage.getItem("profiles")
+    if (savedProfiles) {
+      profiles = JSON.parse(savedProfiles)
+    } else {
+      profiles = [{ id: "default", name: "Default Profile" }]
+      localStorage.setItem("profiles", JSON.stringify(profiles))
+    }
+
+    const profileExists = profiles.some((p) => p.id === currentProfile)
+    if (!profileExists) {
+      currentProfile = "default"
     }
 
     setupEventListeners()
@@ -59,6 +79,10 @@ async function initialize() {
 
     window.addEventListener("viewModeChanged", (e) => {
       viewMode = e.detail.viewMode
+      renderTable()
+    })
+
+    window.addEventListener("profileChanged", () => {
       renderTable()
     })
 
@@ -180,7 +204,7 @@ function renderGrid() {
     endDate: document.getElementById("filterEndDate")?.value || "",
   }
 
-  const result = database.exec("SELECT * FROM skins")
+  const result = database.exec("SELECT * FROM skins WHERE profile_id = ?", [currentProfile])
 
   if (!result || !result[0]) {
     container.innerHTML = `
@@ -199,7 +223,7 @@ function renderGrid() {
   let rows = result[0].values
 
   rows = rows.filter((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform, profileId] = row
 
     if (
       filters.search &&
@@ -219,7 +243,7 @@ function renderGrid() {
 
   const groupedItems = new Map()
   rows.forEach((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform, profileId] = row
 
     const groupKey = `${name}|${buyPrice}`
 
@@ -369,7 +393,7 @@ function renderList() {
     endDate: document.getElementById("filterEndDate")?.value || "",
   }
 
-  const result = database.exec("SELECT * FROM skins")
+  const result = database.exec("SELECT * FROM skins WHERE profile_id = ?", [currentProfile])
 
   if (!result || !result[0]) {
     tbodyElement.innerHTML = `
@@ -388,7 +412,7 @@ function renderList() {
   let rows = result[0].values
 
   rows = rows.filter((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform, profileId] = row
 
     if (
       filters.search &&
@@ -408,7 +432,7 @@ function renderList() {
 
   const groupedItems = new Map()
   rows.forEach((row) => {
-    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform] = row
+    const [id, name, type, buyPrice, sellPrice, purchaseDate, steamLink, platform, profileId] = row
 
     const groupKey = `${name}|${buyPrice}`
 
@@ -554,6 +578,10 @@ function confirmSellSelected() {
   const modal = document.getElementById("modal")
   const title = document.getElementById("modalTitle")
   const body = document.getElementById("modalBody")
+  const modalContent = modal.querySelector(".modal-content")
+  if (modalContent) {
+    modalContent.classList.add("wide")
+  }
 
   const selectedItemsData = []
   const idsArray = Array.from(selectedItems)
@@ -561,7 +589,8 @@ function confirmSellSelected() {
   idsArray.forEach((id) => {
     const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
     if (result && result[0]) {
-      const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform] = result[0].values[0]
+      const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform, profileId] =
+        result[0].values[0]
       selectedItemsData.push({
         id: skinId,
         name: skinName,
@@ -573,96 +602,290 @@ function confirmSellSelected() {
 
   title.textContent = "Sell Selected Items"
   body.innerHTML = `
-    <p class="confirm-text">Set the sell price for each item:</p>
-    <div style="max-height: 400px; overflow-y: auto; margin: 1rem 0;">
-      ${selectedItemsData
-        .map(
-          (item, index) => `
-        <div class="form-group" style="padding: 0.75rem; background: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: 0.75rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <strong style="color: var(--text-primary);">${escapeHtml(item.name)}</strong>
-            <span style="color: var(--text-muted); font-size: 0.875rem;">Buy: €${item.buyPrice.toFixed(2)}</span>
-          </div>
-          <label style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.25rem;">Sell Price (€)</label>
-          <input type="number" id="sellPrice_${item.id}" class="sell-price-input" step="0.01" required placeholder="0.00" data-item-id="${item.id}" data-buy-price="${item.buyPrice}" style="width: 100%;" />
+    <div class="sell-grouped-container">
+      <div class="sell-grouped-header">
+        <p class="confirm-text">Create price groups for ${selectedItemsData.length} selected items</p>
+        <div class="sell-grouped-stats">
+          <span class="stat-item">Total Items: <strong>${selectedItemsData.length}</strong></span>
+          <span class="stat-item">Selected: <strong id="selectedItemsCount">0</strong></span>
+          <span class="stat-item">Remaining: <strong id="remainingItems">${selectedItemsData.length}</strong></span>
         </div>
-      `,
-        )
-        .join("")}
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="sellSelectedItems()">Sell All</button>
+      </div>
+
+      <div class="sell-grouped-content">
+        <div class="sell-grouped-left">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Available Items</h3>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" id="selectAllItemsBtn" style="padding: 6px 12px; font-size: 0.875rem;">Select All</button>
+              <button class="btn btn-secondary" id="deselectAllItemsBtn" style="padding: 6px 12px; font-size: 0.875rem;">Deselect All</button>
+            </div>
+          </div>
+          <div class="available-items-list" id="availableItemsList">
+            ${selectedItemsData
+              .map(
+                (item) => `
+              <div class="available-item" data-item-id="${item.id}">
+                <input type="checkbox" class="available-item-checkbox" data-item-id="${item.id}" />
+                <div class="available-item-info">
+                  <span class="available-item-name">${escapeHtml(item.name)}</span>
+                  <span class="available-item-price">Buy: €${item.buyPrice.toFixed(2)}</span>
+                </div>
+              </div>
+            `,
+              )
+              .join("")}
+          </div>
+        </div>
+
+        <div class="sell-grouped-right">
+          <h3>Price Groups</h3>
+          <div class="price-groups-container" id="priceGroupsContainer">
+            <!-- Groups will be added here -->
+          </div>
+          
+          <div class="add-group-form">
+            <h4>Create New Group</h4>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 12px;">
+              Select items from the left, then set a price to create a group
+            </p>
+            <div class="form-group">
+              <label>Sell Price per Item (€)</label>
+              <input type="number" id="groupPrice" step="0.01" placeholder="0.00" />
+            </div>
+            <button class="btn btn-secondary" id="addGroupBtn" disabled>Add Group (<span id="groupBtnCount">0</span> items)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="sellGroupedBtn">Sell All Groups</button>
+      </div>
     </div>
   `
 
   modal.classList.add("active")
-}
 
-function sellSelectedItems() {
-  const idsToSell = Array.from(selectedItems)
-  if (idsToSell.length === 0) {
-    showToast("No items selected", "warning")
-    return
+  const availableItems = [...selectedItemsData]
+  const selectedForGroup = new Set()
+  const priceGroups = []
+
+  function updateCounts() {
+    document.getElementById("selectedItemsCount").textContent = selectedForGroup.size
+    document.getElementById("remainingItems").textContent = availableItems.length
+    document.getElementById("groupBtnCount").textContent = selectedForGroup.size
+
+    const addGroupBtn = document.getElementById("addGroupBtn")
+    addGroupBtn.disabled = selectedForGroup.size === 0
   }
 
-  const itemPrices = {}
-  let hasInvalidPrice = false
+  function renderAvailableItems() {
+    const container = document.getElementById("availableItemsList")
+    container.innerHTML = availableItems
+      .map(
+        (item) => `
+        <div class="available-item" data-item-id="${item.id}">
+          <input type="checkbox" class="available-item-checkbox" data-item-id="${item.id}" ${selectedForGroup.has(item.id) ? "checked" : ""} />
+          <div class="available-item-info">
+            <span class="available-item-name">${escapeHtml(item.name)}</span>
+            <span class="available-item-price">Buy: €${item.buyPrice.toFixed(2)}</span>
+          </div>
+        </div>
+      `,
+      )
+      .join("")
 
-  idsToSell.forEach((id) => {
-    const priceInput = document.getElementById(`sellPrice_${id}`)
-    if (priceInput) {
-      const sellPrice = Number.parseFloat(priceInput.value)
-      if (isNaN(sellPrice) || sellPrice <= 0) {
-        hasInvalidPrice = true
-        priceInput.style.borderColor = "var(--accent-danger)"
-      } else {
-        itemPrices[id] = sellPrice
-        priceInput.style.borderColor = ""
-      }
+    container.querySelectorAll(".available-item-checkbox").forEach((checkbox) => {
+      checkbox.addEventListener("change", handleItemSelection)
+    })
+  }
+
+  function handleItemSelection(e) {
+    const itemId = Number.parseInt(e.target.dataset.itemId)
+    if (e.target.checked) {
+      selectedForGroup.add(itemId)
+    } else {
+      selectedForGroup.delete(itemId)
     }
+    updateCounts()
+  }
+
+  function renderPriceGroups() {
+    const container = document.getElementById("priceGroupsContainer")
+    if (priceGroups.length === 0) {
+      container.innerHTML = '<p class="empty-groups">No groups created yet</p>'
+      return
+    }
+
+    container.innerHTML = priceGroups
+      .map(
+        (group, index) => `
+        <div class="price-group-card">
+          <div class="price-group-header">
+            <h4>Group ${index + 1}</h4>
+            <button class="btn-remove-group" data-group-index="${index}">×</button>
+          </div>
+          <div class="price-group-details">
+            <div class="price-group-detail">
+              <span class="label">Quantity:</span>
+              <span class="value">${group.quantity} items</span>
+            </div>
+            <div class="price-group-detail">
+              <span class="label">Price per item:</span>
+              <span class="value">€${group.price.toFixed(2)}</span>
+            </div>
+            <div class="price-group-detail">
+              <span class="label">Total:</span>
+              <span class="value total">€${(group.quantity * group.price).toFixed(2)}</span>
+            </div>
+            <div class="price-group-detail">
+              <span class="label">Avg. Buy Price:</span>
+              <span class="value">€${group.avgBuyPrice.toFixed(2)}</span>
+            </div>
+            <div class="price-group-detail profit">
+              <span class="label">Profit:</span>
+              <span class="value ${group.totalProfit >= 0 ? "positive" : "negative"}">
+                ${group.totalProfit >= 0 ? "+" : ""}€${group.totalProfit.toFixed(2)}
+              </span>
+            </div>
+          </div>
+          <div class="price-group-items">
+            ${group.items.map((item) => `<span class="group-item-tag">${escapeHtml(item.name)}</span>`).join("")}
+          </div>
+        </div>
+      `,
+      )
+      .join("")
+
+    document.querySelectorAll(".btn-remove-group").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const groupIndex = Number.parseInt(e.target.dataset.groupIndex)
+        const removedGroup = priceGroups[groupIndex]
+        availableItems.push(...removedGroup.items)
+        priceGroups.splice(groupIndex, 1)
+        renderAvailableItems()
+        renderPriceGroups()
+        updateCounts()
+      })
+    })
+  }
+
+  document.querySelectorAll(".available-item-checkbox").forEach((checkbox) => {
+    checkbox.addEventListener("change", handleItemSelection)
   })
 
-  if (hasInvalidPrice) {
-    showToast("Please enter valid prices for all items", "error")
-    return
-  }
+  document.getElementById("selectAllItemsBtn").addEventListener("click", () => {
+    availableItems.forEach((item) => selectedForGroup.add(item.id))
+    renderAvailableItems()
+    updateCounts()
+  })
 
+  document.getElementById("deselectAllItemsBtn").addEventListener("click", () => {
+    selectedForGroup.clear()
+    renderAvailableItems()
+    updateCounts()
+  })
+
+  document.getElementById("addGroupBtn").addEventListener("click", () => {
+    const price = Number.parseFloat(document.getElementById("groupPrice").value)
+
+    if (selectedForGroup.size === 0) {
+      showToast("Please select items to add to the group", "warning")
+      return
+    }
+
+    if (isNaN(price) || price <= 0) {
+      showToast("Please enter a valid price", "error")
+      return
+    }
+
+    const groupItems = availableItems.filter((item) => selectedForGroup.has(item.id))
+
+    groupItems.forEach((item) => {
+      const index = availableItems.findIndex((i) => i.id === item.id)
+      if (index > -1) {
+        availableItems.splice(index, 1)
+      }
+    })
+
+    const totalBuyPrice = groupItems.reduce((sum, item) => sum + item.buyPrice, 0)
+    const avgBuyPrice = totalBuyPrice / groupItems.length
+    const totalProfit = groupItems.length * price - totalBuyPrice
+
+    priceGroups.push({
+      quantity: groupItems.length,
+      price,
+      items: groupItems,
+      avgBuyPrice,
+      totalProfit,
+    })
+
+    selectedForGroup.clear()
+    document.getElementById("groupPrice").value = ""
+
+    renderAvailableItems()
+    renderPriceGroups()
+    updateCounts()
+  })
+
+  document.getElementById("sellGroupedBtn").addEventListener("click", () => {
+    if (priceGroups.length === 0) {
+      showToast("Please create at least one price group", "warning")
+      return
+    }
+
+    if (availableItems.length > 0) {
+      const confirmSell = confirm(
+        `You have ${availableItems.length} items not assigned to any group. Do you want to continue?`,
+      )
+      if (!confirmSell) return
+    }
+
+    sellGroupedItems(priceGroups)
+  })
+
+  updateCounts()
+}
+
+function sellGroupedItems(priceGroups) {
   const history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
   let totalProfit = 0
   let totalSold = 0
-  let exampleName = ""
 
-  idsToSell.forEach((id) => {
-    const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
-    if (!result || !result[0]) return
+  priceGroups.forEach((group) => {
+    group.items.forEach((item) => {
+      const result = database.exec("SELECT * FROM skins WHERE id = ?", [item.id])
+      if (!result || !result[0]) return
 
-    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform] = result[0].values[0]
-    const sellPrice = itemPrices[id]
+      const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform, profileId] =
+        result[0].values[0]
 
-    const profit = sellPrice - buyPrice
-    totalProfit += profit
-    totalSold++
-    if (!exampleName) exampleName = skinName
+      const profit = group.price - buyPrice
+      totalProfit += profit
+      totalSold++
 
-    history.push({
-      id: Date.now() + Math.random(),
-      name: skinName,
-      type: type,
-      buy_price: buyPrice,
-      sell_price: sellPrice,
-      purchase_date: purchaseDate,
-      sale_date: new Date().toISOString().split("T")[0],
-      profit: profit,
-      steam_link: steamLink,
-      platform: platform,
+      history.push({
+        id: Date.now() + Math.random(),
+        name: skinName,
+        type: type,
+        buy_price: buyPrice,
+        sell_price: group.price,
+        purchase_date: purchaseDate,
+        sale_date: new Date().toISOString().split("T")[0],
+        profit: profit,
+        steam_link: steamLink,
+        platform: platform,
+        profile_id: profileId,
+      })
     })
   })
 
   localStorage.setItem("skinsHistory", JSON.stringify(history))
 
-  const placeholders = idsToSell.map(() => "?").join(",")
-  database.run(`DELETE FROM skins WHERE id IN (${placeholders})`, idsToSell)
+  const allIds = priceGroups.flatMap((group) => group.items.map((item) => item.id))
+  const placeholders = allIds.map(() => "?").join(",")
+  database.run(`DELETE FROM skins WHERE id IN (${placeholders})`, allIds)
 
   saveDatabase()
   selectedItems.clear()
@@ -670,9 +893,10 @@ function sellSelectedItems() {
   closeModal()
 
   const profitText = totalProfit >= 0 ? `+€${totalProfit.toFixed(2)}` : `-€${Math.abs(totalProfit).toFixed(2)}`
-  const quantityText = totalSold > 1 ? ` (${totalSold} items)` : ""
-
-  showToast(`${exampleName}${quantityText} sold (${profitText} total)`, totalProfit >= 0 ? "success" : "warning")
+  showToast(
+    `${totalSold} items sold in ${priceGroups.length} groups (${profitText} total)`,
+    totalProfit >= 0 ? "success" : "warning",
+  )
 }
 
 function confirmDeleteSelected() {
@@ -785,7 +1009,8 @@ function sellSkin(ids, name) {
     const result = database.exec("SELECT * FROM skins WHERE id = ?", [id])
     if (!result || !result[0]) return
 
-    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform] = result[0].values[0]
+    const [skinId, skinName, type, buyPrice, oldSellPrice, purchaseDate, steamLink, platform, profileId] =
+      result[0].values[0]
 
     history.push({
       id: Date.now() + Math.random(),
@@ -798,6 +1023,7 @@ function sellSkin(ids, name) {
       profit: sellPrice - buyPrice,
       steam_link: steamLink,
       platform: platform,
+      profile_id: profileId,
     })
   })
 
@@ -912,53 +1138,74 @@ function showAddModal() {
   const title = document.getElementById("modalTitle")
   const body = document.getElementById("modalBody")
 
+  const currentProfileName = profiles.find((p) => p.id === currentProfile)?.name || "Default Profile"
+
   title.textContent = "Add New Skin"
   body.innerHTML = `
     <form id="addForm">
-      <div class="form-group">
-        <label>Platform</label>
-        <select id="platformSelect" required class="form-select">
-          <option value="Steam">Steam</option>
-        </select>
-        <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">
-          More platforms coming soon
-        </p>
+      <div class="form-two-column">
+        <div class="form-group full-width">
+          <label>Profile</label>
+          <select id="profileSelectModal" required class="form-select">
+            ${profiles.map((p) => `<option value="${p.id}" ${p.id === currentProfile ? "selected" : ""}>${p.name}</option>`).join("")}
+          </select>
+          <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Item will be added to: <strong>${currentProfileName}</strong>
+          </p>
+        </div>
+        
+        <div class="form-group">
+          <label>Platform</label>
+          <select id="platformSelect" required class="form-select">
+            <option value="Steam">Steam</option>
+          </select>
+          <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">
+            More platforms coming soon
+          </p>
+        </div>
+        
+        <div class="form-group">
+          <label>Type</label>
+          <select id="skinType" required class="form-select">
+            <option value="">Select type...</option>
+            <option value="Knife">Knife</option>
+            <option value="Skin">Skin</option>
+            <option value="Case">Case</option>
+            <option value="Gloves">Gloves</option>
+            <option value="Agent">Agent</option>
+            <option value="Sticker">Sticker</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        
+        <div class="form-group full-width">
+          <label>Steam Market Link</label>
+          <input type="url" id="steamLink" placeholder="https://steamcommunity.com/market/listings/..." />
+          <button type="button" class="btn btn-secondary" id="fetchSteamData" style="margin-top: 8px;">Fetch Data</button>
+          <div id="steamFetchStatus" style="margin-top: 8px; font-size: 0.875rem;"></div>
+        </div>
+        
+        <div class="form-group full-width">
+          <label>Name</label>
+          <input type="text" id="skinName" required placeholder="e.g. AK-47 Redline" />
+        </div>
+        
+        <div class="form-group">
+          <label>Buy Price (€)</label>
+          <input type="number" id="buyPrice" step="0.01" required placeholder="0.00" />
+        </div>
+        
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" id="quantity" min="1" value="1" required placeholder="1" />
+        </div>
+        
+        <div class="form-group full-width">
+          <label>Purchase Date</label>
+          <input type="date" id="purchaseDate" required />
+        </div>
       </div>
-      <div class="form-group">
-        <label>Steam Market Link</label>
-        <input type="url" id="steamLink" placeholder="https://steamcommunity.com/market/listings/..." />
-        <button type="button" class="btn btn-secondary" id="fetchSteamData" style="margin-top: 8px;">Fetch Data</button>
-        <div id="steamFetchStatus" style="margin-top: 8px; font-size: 0.875rem;"></div>
-      </div>
-      <div class="form-group">
-        <label>Name</label>
-        <input type="text" id="skinName" required placeholder="e.g. AK-47 Redline" />
-      </div>
-      <div class="form-group">
-        <label>Type</label>
-        <select id="skinType" required class="form-select">
-          <option value="">Select type...</option>
-          <option value="Knife">Knife</option>
-          <option value="Skin">Skin</option>
-          <option value="Case">Case</option>
-          <option value="Gloves">Gloves</option>
-          <option value="Agent">Agent</option>
-          <option value="Sticker">Sticker</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Buy Price (€)</label>
-        <input type="number" id="buyPrice" step="0.01" required placeholder="0.00" />
-      </div>
-      <div class="form-group">
-        <label>Quantity</label>
-        <input type="number" id="quantity" min="1" value="1" required placeholder="1" />
-      </div>
-      <div class="form-group">
-        <label>Purchase Date</label>
-        <input type="date" id="purchaseDate" required />
-      </div>
+      
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Add Skin</button>
@@ -968,6 +1215,15 @@ function showAddModal() {
 
   modal.classList.add("active")
   document.getElementById("purchaseDate").valueAsDate = new Date()
+
+  const profileSelectModal = document.getElementById("profileSelectModal")
+  profileSelectModal.addEventListener("change", (e) => {
+    const selectedProfile = profiles.find((p) => p.id === e.target.value)
+    const profileInfo = body.querySelector(".form-group.full-width p strong")
+    if (profileInfo && selectedProfile) {
+      profileInfo.textContent = selectedProfile.name
+    }
+  })
 
   const nameInput = document.getElementById("skinName")
   const typeSelect = document.getElementById("skinType")
@@ -1077,18 +1333,21 @@ function addSkin() {
   const steamLink = document.getElementById("steamLink").value.trim() || null
   const quantity = Number.parseInt(document.getElementById("quantity").value) || 1
   const platform = document.getElementById("platformSelect").value
+  const selectedProfile = document.getElementById("profileSelectModal").value
 
   for (let i = 0; i < quantity; i++) {
     database.run(
-      "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link, platform) VALUES (?, ?, ?, ?, ?, ?)",
-      [name, type, buyPrice, 0, purchaseDate, steamLink, platform],
+      "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link, platform, profile_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [name, type, buyPrice, 0, purchaseDate, steamLink, platform, selectedProfile],
     )
   }
 
   saveDatabase()
   renderTable()
   closeModal()
-  showToast(`${quantity} ${name} added to inventory`, "success")
+
+  const profileName = profiles.find((p) => p.id === selectedProfile)?.name || "profile"
+  showToast(`${quantity} ${name} added to ${profileName}`, "success")
 }
 
 async function showInfoModal(id, steamLink, savedName, purchaseDate) {

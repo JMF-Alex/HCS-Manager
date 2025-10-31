@@ -4,23 +4,16 @@ let filteredData = []
 const selectedItems = new Set()
 let viewMode = localStorage.getItem("viewMode") || "list"
 
-function closeModal() {
-  const modal = document.getElementById("modal")
-  if (modal) modal.classList.remove("active")
+if (profiles.length === 0) {
+  profiles = [{ id: "default", name: "Default Profile", createdAt: new Date().toISOString() }]
+  localStorage.setItem("profiles", JSON.stringify(profiles))
+  currentProfile = "default"
+  localStorage.setItem("currentProfile", currentProfile)
 }
 
-function showToast(message, type) {
-  const toastContainer = document.getElementById("toastContainer")
-  if (!toastContainer) return
-
-  const toast = document.createElement("div")
-  toast.className = `toast ${type}`
-  toast.textContent = message
-  toastContainer.appendChild(toast)
-
-  setTimeout(() => {
-    toastContainer.removeChild(toast)
-  }, 3000)
+if (!profiles.find((p) => p.id === currentProfile)) {
+  currentProfile = profiles[0].id
+  localStorage.setItem("currentProfile", currentProfile)
 }
 
 initialize()
@@ -35,6 +28,11 @@ function initialize() {
 
   window.addEventListener("viewModeChanged", (e) => {
     viewMode = e.detail.viewMode
+    renderTable()
+  })
+
+  window.addEventListener("profileChanged", (e) => {
+    currentProfile = e.detail.profileId
     renderTable()
   })
 
@@ -230,6 +228,8 @@ function renderGrid() {
   }
 
   filteredData = history.filter((item) => {
+    if (item.profile_id !== currentProfile) return false
+
     if (
       filters.search &&
       !item.name.toLowerCase().includes(filters.search) &&
@@ -421,6 +421,8 @@ function renderList() {
   }
 
   filteredData = history.filter((item) => {
+    if (item.profile_id !== currentProfile) return false
+
     if (
       filters.search &&
       !item.name.toLowerCase().includes(filters.search) &&
@@ -645,7 +647,7 @@ async function restoreItem(ids, quantity) {
 
     itemsToRestore.forEach((item) => {
       database.run(
-        "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link, platform) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO skins (name, type, buy_price, sell_price, purchase_date, steam_link, platform, profile_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
           item.name,
           item.type,
@@ -654,6 +656,7 @@ async function restoreItem(ids, quantity) {
           item.purchase_date || null,
           item.steam_link || null,
           item.platform || "Steam",
+          item.profile_id || currentProfile,
         ],
       )
     })

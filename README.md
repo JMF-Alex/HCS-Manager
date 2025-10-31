@@ -78,11 +78,11 @@ Once opened, you can:
 - [ ] Multi-language support (in process)
 - [ ] Multiple export/import options
 - [ ] Add multiple market options, not only Steam (in process)
-- [ ] Add multiple inventories/histories profiles
+- [x] Add multiple inventories/histories profiles
 - [ ] Add steam comissions calculator
 - [ ] Import Steam inventory
-- [x] Switch between list and grid view for items in inventory and history
 - [ ] News page
+- [x] Modify sell selected modal for group items
 
 ## Contributing  
 Contributions are welcome!  

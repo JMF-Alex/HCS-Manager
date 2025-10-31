@@ -1,6 +1,21 @@
 let database
 let sqlModule
 
+let profiles = JSON.parse(localStorage.getItem("profiles") || "[]")
+let currentProfile = localStorage.getItem("currentProfile") || null
+
+if (profiles.length === 0) {
+  profiles = [{ id: "default", name: "Default Profile", createdAt: new Date().toISOString() }]
+  localStorage.setItem("profiles", JSON.stringify(profiles))
+  currentProfile = "default"
+  localStorage.setItem("currentProfile", currentProfile)
+}
+
+if (!profiles.find((p) => p.id === currentProfile)) {
+  currentProfile = profiles[0].id
+  localStorage.setItem("currentProfile", currentProfile)
+}
+
 initialize()
 
 async function initialize() {
@@ -13,6 +28,12 @@ async function initialize() {
   if (savedData) {
     const dataArray = new Uint8Array(JSON.parse(savedData))
     database = new sqlModule.Database(dataArray)
+
+    try {
+      database.exec("SELECT profile_id FROM skins LIMIT 1")
+    } catch (e) {
+      database.run("ALTER TABLE skins ADD COLUMN profile_id TEXT DEFAULT 'default'")
+    }
   } else {
     database = new sqlModule.Database()
     database.run(`CREATE TABLE IF NOT EXISTS skins (
@@ -22,11 +43,244 @@ async function initialize() {
       buy_price REAL, 
       sell_price REAL,
       purchase_date TEXT,
-      platform TEXT DEFAULT 'Steam'
+      platform TEXT DEFAULT 'Steam',
+      profile_id TEXT DEFAULT 'default'
     );`)
   }
 
   initializeTheme()
+  initializeProfileSelector()
+}
+
+function initializeProfileSelector() {
+  const currentPage = window.location.pathname
+  const isInventoryOrHistory = currentPage.includes("inventory") || currentPage.includes("history")
+
+  if (!isInventoryOrHistory) return
+
+  const navActions = document.querySelector(".nav-actions")
+  if (!navActions) return
+
+  if (document.getElementById("profileSelector")) return
+
+  const profileSelector = document.createElement("div")
+  profileSelector.className = "profile-selector"
+  profileSelector.innerHTML = `
+    <select id="profileSelect" class="profile-select">
+      ${profiles.map((p) => `<option value="${p.id}" ${p.id === currentProfile ? "selected" : ""}>${p.name}</option>`).join("")}
+    </select>
+    <button id="manageProfiles" class="btn btn-secondary" title="Manage Profiles">⚙️</button>
+  `
+
+  const firstButton = navActions.querySelector("button")
+  if (firstButton) {
+    navActions.insertBefore(profileSelector, firstButton)
+  }
+
+  const profileSelect = document.getElementById("profileSelect")
+  if (profileSelect) {
+    profileSelect.addEventListener("change", (e) => {
+      currentProfile = e.target.value
+      localStorage.setItem("currentProfile", currentProfile)
+
+      window.dispatchEvent(new CustomEvent("profileChanged", { detail: { profileId: currentProfile } }))
+      showToast(`Switched to ${profiles.find((p) => p.id === currentProfile).name}`, "info")
+    })
+  }
+
+  const manageBtn = document.getElementById("manageProfiles")
+  if (manageBtn) {
+    manageBtn.addEventListener("click", showProfileManagementModal)
+  }
+}
+
+function showProfileManagementModal() {
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  title.textContent = "Manage Profiles"
+  body.innerHTML = `
+    <div class="profile-management">
+      <div class="profile-list">
+        ${profiles
+          .map(
+            (p) => `
+          <div class="profile-item" data-profile-id="${p.id}">
+            <div class="profile-info">
+              <strong>${p.name}</strong>
+              ${p.id === currentProfile ? '<span class="profile-badge">Active</span>' : ""}
+            </div>
+            <div class="profile-actions">
+              <button class="btn-icon" onclick="editProfile('${p.id}')" title="Edit">✏️</button>
+              ${profiles.length > 1 ? `<button class="btn-icon" onclick="deleteProfile('${p.id}')" title="Delete">🗑️</button>` : ""}
+            </div>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>
+      <button type="button" class="btn btn-primary" id="addNewProfile" style="width: 100%; margin-top: 1rem;">
+        + Add New Profile
+      </button>
+      <div class="modal-actions" style="margin-top: 1rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  `
+
+  modal.classList.add("active")
+
+  document.getElementById("addNewProfile").addEventListener("click", showAddProfileModal)
+}
+
+function showAddProfileModal() {
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  title.textContent = "Add New Profile"
+  body.innerHTML = `
+    <form id="addProfileForm">
+      <div class="form-group">
+        <label>Profile Name</label>
+        <input type="text" id="profileName" required placeholder="e.g. Main Inventory, Trading, Investment" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="showProfileManagementModal()">Back</button>
+        <button type="submit" class="btn btn-primary">Create Profile</button>
+      </div>
+    </form>
+  `
+
+  modal.classList.add("active")
+
+  document.getElementById("addProfileForm").onsubmit = (e) => {
+    e.preventDefault()
+    const name = document.getElementById("profileName").value.trim()
+
+    if (!name) {
+      showToast("Please enter a profile name", "error")
+      return
+    }
+
+    const newProfile = {
+      id: Date.now().toString(),
+      name: name,
+      createdAt: new Date().toISOString(),
+    }
+
+    profiles.push(newProfile)
+    localStorage.setItem("profiles", JSON.stringify(profiles))
+
+    updateProfileSelector()
+
+    showToast(`Profile "${name}" created successfully`, "success")
+    showProfileManagementModal()
+  }
+}
+
+window.editProfile = (profileId) => {
+  const profile = profiles.find((p) => p.id === profileId)
+  if (!profile) return
+
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  title.textContent = "Edit Profile"
+  body.innerHTML = `
+    <form id="editProfileForm">
+      <div class="form-group">
+        <label>Profile Name</label>
+        <input type="text" id="editProfileName" value="${profile.name}" required />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="showProfileManagementModal()">Back</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  `
+
+  modal.classList.add("active")
+
+  document.getElementById("editProfileForm").onsubmit = (e) => {
+    e.preventDefault()
+    const newName = document.getElementById("editProfileName").value.trim()
+
+    if (!newName) {
+      showToast("Please enter a profile name", "error")
+      return
+    }
+
+    profile.name = newName
+    localStorage.setItem("profiles", JSON.stringify(profiles))
+
+    updateProfileSelector()
+    showToast("Profile updated successfully", "success")
+    showProfileManagementModal()
+  }
+}
+
+window.deleteProfile = (profileId) => {
+  if (profiles.length === 1) {
+    showToast("Cannot delete the last profile", "error")
+    return
+  }
+
+  const profile = profiles.find((p) => p.id === profileId)
+  if (!profile) return
+
+  const modal = document.getElementById("modal")
+  const title = document.getElementById("modalTitle")
+  const body = document.getElementById("modalBody")
+
+  title.textContent = "Delete Profile"
+  body.innerHTML = `
+    <p class="confirm-text">Are you sure you want to delete the profile "<strong>${profile.name}</strong>"? All items in this profile will be permanently deleted. This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" onclick="showProfileManagementModal()">Cancel</button>
+      <button type="button" class="btn btn-danger" onclick="confirmDeleteProfile('${profileId}')">Delete Profile</button>
+    </div>
+  `
+
+  modal.classList.add("active")
+}
+
+window.confirmDeleteProfile = (profileId) => {
+  database.run("DELETE FROM skins WHERE profile_id = ?", [profileId])
+
+  let history = JSON.parse(localStorage.getItem("skinsHistory") || "[]")
+  history = history.filter((item) => item.profile_id !== profileId)
+  localStorage.setItem("skinsHistory", JSON.stringify(history))
+
+  profiles = profiles.filter((p) => p.id !== profileId)
+  localStorage.setItem("profiles", JSON.stringify(profiles))
+
+  if (currentProfile === profileId) {
+    currentProfile = profiles[0].id
+    localStorage.setItem("currentProfile", currentProfile)
+  }
+
+  const exportedData = database.export()
+  const dataArray = Array.from(exportedData)
+  localStorage.setItem("skinsDB", JSON.stringify(dataArray))
+
+  updateProfileSelector()
+
+  window.dispatchEvent(new CustomEvent("profileChanged", { detail: { profileId: currentProfile } }))
+
+  showToast("Profile deleted successfully", "success")
+  closeModal()
+}
+
+function updateProfileSelector() {
+  const profileSelect = document.getElementById("profileSelect")
+  if (profileSelect) {
+    profileSelect.innerHTML = profiles
+      .map((p) => `<option value="${p.id}" ${p.id === currentProfile ? "selected" : ""}>${p.name}</option>`)
+      .join("")
+  }
 }
 
 function initializeTheme() {

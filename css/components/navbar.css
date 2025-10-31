@@ -77,6 +77,35 @@
   flex-shrink: 0;
 }
 
+.profile-selector {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.profile-select {
+  padding: 0.625rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 150px;
+}
+
+.profile-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.profile-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
 @media (max-width: 1024px) {
   .navbar {
     flex-wrap: wrap;
@@ -105,5 +134,11 @@
 
   .nav-actions {
     gap: var(--spacing-sm);
+  }
+
+  .profile-select {
+    min-width: 120px;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
   }
 }
