@@ -83,6 +83,7 @@ Once opened, you can:
 - [ ] Import Steam inventory
 - [ ] News page
 - [x] Modify sell selected modal for group items
+- [ ] Modify sell modal for group items
 
 ## Contributing  
 Contributions are welcome!  
